@@ -1,0 +1,147 @@
+{
+  "@context": "https://etzhayyim.com/ns/kotodama/v1",
+  "@id": "did:web:animeka.etzhayyim.com",
+  "component": {
+    "env": {
+      "APP_EMBED_MODE": "pipeline"
+    },
+    "path": "src/app.ts"
+  },
+  "convoSystemPrompt": "You are etzhayyim-wasm-animeka agent. Team-based anime creation platform powered by KAMI Engine X-sheet timeline — help users produce anime episodes across the full 12-stage pipeline (script → storyboard → layout → key animation → in-between → color design → finish → background → composite → edit → sound → delivery). Respond helpfully in the users language.",
+  "deploy": {},
+  "duties": ["勤労の義務"],
+  "governance": {
+    "raci": "responsible",
+    "classification": "internal",
+    "complianceFrameworks": ["animeka-policy"]
+  },
+  "kpi": ["credits の獲得"],
+  "name": "etzhayyim-wasm-animeka",
+  "nanoid": "an1m3k4x",
+  "performerType": "service",
+  "profile": {
+    "agentType": "semi-autonomous",
+    "capabilities": [
+      "edge-assets",
+      "bpmn-dispatch",
+      "timeline-wasm"
+    ],
+    "description": "Thin Cloudflare edge facade for Animeka. Work, episode, cut, retake, chat, and generation pipeline business logic runs in AgentGateway MCP + pod-side LangServer workers.",
+    "displayName": "Animeka",
+    "isBot": true
+  },
+  "project": "animeka",
+  "routes": [
+    {
+      "host": "animeka.etzhayyim.com",
+      "paths": ["/"],
+      "tls": true
+    }
+  ],
+  "runtimeType": "worker",
+  "build": {
+    "guestLanguage": "ts",
+    "role": "thin-edge"
+  },
+  "space": {
+    "channels": [
+      {
+        "default": true,
+        "description": "Public anime feed — new works, episodes, PV drops, delivery",
+        "kind": "public",
+        "name": "animeka-feed"
+      }
+    ],
+    "description": "Team-based anime creation platform powered by KAMI Engine",
+    "historyVisibility": "world-readable",
+    "joinRule": "public",
+    "name": "Animeka"
+  },
+  "triggers": {
+    "subscribeRepos": {
+      "collections": [
+        "app.bsky.feed.post",
+        "app.bsky.feed.like",
+        "app.bsky.graph.follow",
+        "com.etzhayyim.animeka.work",
+        "com.etzhayyim.animeka.episode",
+        "com.etzhayyim.animeka.script",
+        "com.etzhayyim.animeka.scene",
+        "com.etzhayyim.animeka.cut",
+        "com.etzhayyim.animeka.storyboard",
+        "com.etzhayyim.animeka.layout",
+        "com.etzhayyim.animeka.keyframe",
+        "com.etzhayyim.animeka.inbetween",
+        "com.etzhayyim.animeka.colorModel",
+        "com.etzhayyim.animeka.colorTrace",
+        "com.etzhayyim.animeka.background",
+        "com.etzhayyim.animeka.composite",
+        "com.etzhayyim.animeka.soundCue",
+        "com.etzhayyim.animeka.retake",
+        "com.etzhayyim.animeka.character",
+        "com.etzhayyim.animeka.asset",
+        "com.etzhayyim.animeka.project",
+        "com.etzhayyim.animeka.chatMessage"
+      ]
+    }
+  },
+  "derive": {
+    "rules": [
+      {
+        "id": "episode-published-social",
+        "description": "Tier 1 social announcement of a newly published episode. Auto-emits an app.bsky.feed.post authored by the work's path-based DID.",
+        "on": {
+          "collection": "com.etzhayyim.animeka.episode",
+          "action": "create",
+          "where": { "record.status": "published" }
+        },
+        "emit": {
+          "type": "app.bsky.feed.post",
+          "did": "{{resolve(record.workRef).workDid}}",
+          "text": "🎬 #{{record.episodeNum}} {{record.titleJP}} 公開\nwatch → https://animeka.etzhayyim.com/at/an1m3k4x.etzhayyim.com/com.etzhayyim.animeka.episode/{{self.rkey}}",
+          "embed": {
+            "$type": "app.bsky.embed.recordWithMedia",
+            "record": {
+              "$type": "app.bsky.embed.record",
+              "record": { "uri": "{{self.uri}}", "cid": "{{self.cid}}" }
+            },
+            "media": {
+              "$type": "app.bsky.embed.images",
+              "images": [
+                {
+                  "image": { "$type": "blob", "ref": { "$link": "{{record.thumbCid}}" }, "mimeType": "image/jpeg" },
+                  "alt": "{{record.titleJP}}"
+                }
+              ]
+            }
+          },
+          "_meta": {
+            "sideEffect": "linkBackPostUri",
+            "linkBackField": "episodePostUri",
+            "linkBackTarget": "{{self.uri}}"
+          }
+        }
+      }
+    ],
+    "_pipelineIntent": {
+      "note": "ADR-2604231328 — 12-stage animeka pipeline handoff. MVP triggers each stage via /cuts UI Generate button (XRPC POST to dispatcher.etzhayyim.com:8080/xrpc/com.etzhayyim.animeka.<stage>). Auto-derive chain below is Phase 2 (requires dispatcher emit type support).",
+      "handoffRules": [
+        { "on": "scene.create",                      "invoke": "com.etzhayyim.animeka.breakdownScene" },
+        { "on": "cut.create",                        "invokeN": 3, "invoke": "com.etzhayyim.animeka.generateStoryboard", "fanoutVar": "candidateNum" },
+        { "on": "storyboard.update status=approved", "invoke": "com.etzhayyim.animeka.generateLayout" },
+        { "on": "layout.update status=approved",     "parallel": ["com.etzhayyim.animeka.generateKeyframe", "com.etzhayyim.animeka.generateBackground"] },
+        { "on": "keyframe.pair_committed",           "invoke": "com.etzhayyim.animeka.generateInbetween" },
+        { "on": "colorModel.update status=ready",    "invoke": "com.etzhayyim.animeka.autoTrace",     "fanoutOver": "keyframes" },
+        { "on": "colorTrace.ready && background.ready", "invoke": "com.etzhayyim.animeka.renderComposite" },
+        { "on": "cut.update status=approved",        "invoke": "com.etzhayyim.animeka.generateSoundCue", "fanoutOver": "soundCues" },
+        { "on": "episode.update status=ready",       "invoke": "com.etzhayyim.animeka.publishEpisode", "hitl": true }
+      ]
+    },
+    "_helpers": {
+      "resolve": "Resolves a com.atproto.repo.strongRef to the target record (e.g. resolve workRef → work.did).",
+      "derived": "Looks up a previously-emitted derived-post strongRef via the linkBack field set by an upstream rule.",
+      "_matchText": "Resolves richtext facet byteStart/byteEnd by locating the literal substring in the emitted text."
+    }
+  },
+  "uiType": "appview"
+}

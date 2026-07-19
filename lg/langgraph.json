@@ -1,0 +1,48 @@
+{
+  "$comment": "LangGraph Server config — animeka.etzhayyim.com actor. 27 graphs (publishEpisode added 2026-05-15).",
+  "dependencies": ["./lg_animeka", "../../../40-engine/kotoba/crates/kotoba-kotodama/py"],
+  "graphs": {
+    "health":            "./lg_animeka/graphs/health.py:GRAPH",
+    "list_works":        "./lg_animeka/graphs/list_works.py:GRAPH",
+    "list_cuts":         "./lg_animeka/graphs/list_cuts.py:GRAPH",
+    "agent_chat":        "./lg_animeka/graphs/agent_chat.py:GRAPH",
+    "get_cut":           "./lg_animeka/graphs/get_cut.py:GRAPH",
+    "list_episodes":     "./lg_animeka/graphs/list_episodes.py:GRAPH",
+    "list_retakes":      "./lg_animeka/graphs/list_retakes.py:GRAPH",
+    "create_work":       "./lg_animeka/graphs/create_work.py:GRAPH",
+    "add_episode":       "./lg_animeka/graphs/add_episode.py:GRAPH",
+    "add_cut":           "./lg_animeka/graphs/add_cut.py:GRAPH",
+    "update_cut_stage":  "./lg_animeka/graphs/update_cut_stage.py:GRAPH",
+    "submit_retake":     "./lg_animeka/graphs/submit_retake.py:GRAPH",
+    "resolve_retake":    "./lg_animeka/graphs/resolve_retake.py:GRAPH",
+    "generate_script":       "./lg_animeka/graphs/generate_script.py:GRAPH",
+    "generate_storyboard":   "./lg_animeka/graphs/generate_storyboard.py:GRAPH",
+    "generate_layout":       "./lg_animeka/graphs/generate_layout.py:GRAPH",
+    "generate_keyframe":     "./lg_animeka/graphs/generate_keyframe.py:GRAPH",
+    "generate_inbetween":    "./lg_animeka/graphs/generate_inbetween.py:GRAPH",
+    "generate_background":   "./lg_animeka/graphs/generate_background.py:GRAPH",
+    "design_color_model":    "./lg_animeka/graphs/design_color_model.py:GRAPH",
+    "autopilot":             "./lg_animeka/graphs/autopilot.py:GRAPH",
+    "cut_runner":            "./lg_animeka/graphs/cut_runner.py:GRAPH",
+    "auto_trace_cut":        "./lg_animeka/graphs/auto_trace_cut.py:GRAPH",
+    "breakdown_scene":       "./lg_animeka/graphs/breakdown_scene.py:GRAPH",
+    "generate_audio":        "./lg_animeka/graphs/generate_audio.py:GRAPH",
+    "assemble_episode":      "./lg_animeka/graphs/assemble_episode.py:GRAPH",
+    "publish_episode":       "./lg_animeka/graphs/publish_episode.py:GRAPH"
+  },
+  "env": ".env",
+  "python_version": "3.11",
+  "checkpointer": {
+    "type": "postgres",
+    "$comment": "RW PG :4566 direct via _RwAsyncPostgresSaver subclass.",
+    "conn_str_env": "RW_URL"
+  },
+  "crons": [
+    {"graph": "autopilot",        "schedule": "*/15 * * * *", "input": {}},
+    {"graph": "assemble_episode", "schedule": "0 3 * * *",    "input": {}},
+    {"graph": "publish_episode",  "schedule": "30 3 * * *",   "input": {}}
+  ],
+  "auth": {
+    "$comment": "Optional x-api-key. /xrpc/{nsid} is unauthenticated (cloudflared tunnel layer trust)."
+  }
+}

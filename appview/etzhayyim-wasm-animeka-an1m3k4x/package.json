@@ -1,0 +1,14 @@
+{
+  "name": "etzhayyim-wasm-animeka-an1m3k4x",
+  "version": "0.1.0",
+  "description": "animeka.etzhayyim.com — Team-based anime creation appview (KAMI Engine X-sheet timeline, 12-stage pipeline)",
+  "main": "svelte/.svelte-kit/cloudflare/_worker.js",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --dir svelte dev",
+    "build": "pnpm --dir svelte build",
+    "preview": "pnpm --dir svelte preview",
+    "check": "pnpm --dir svelte check"
+  }
+}

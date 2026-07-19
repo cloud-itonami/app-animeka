@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Animeka Timeline v1</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #f0ead6; }
+    #gc { display: block; width: 100vw; height: 100vh; }
+  </style>
+</head>
+<body>
+  <canvas id="gc"></canvas>
+  <script type="module">
+    import init, { run_animeka_timeline } from './kami_app_animeka_timeline.js';
+    await init('./kami_app_animeka_timeline_bg.wasm');
+    await run_animeka_timeline('gc');
+  </script>
+</body>
+</html>

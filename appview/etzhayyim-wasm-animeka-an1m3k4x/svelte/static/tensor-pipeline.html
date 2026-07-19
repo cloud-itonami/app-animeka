@@ -1,0 +1,1138 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>animeka_full_pipeline_v9 — USD Cut Tensor Network</title>
+<style>
+  :root {
+    --bg-canvas: #14161b;
+    --grid: rgba(80, 90, 110, 0.16);
+    --grid-major: rgba(110, 125, 150, 0.22);
+    --bg-node: #232733; --bg-node-h: #2c303d; --bg-header: #303544;
+    --bg-control: #1f2733; --bg-control-h: #2a3340;
+    --bg-data: #232733;
+    --bg-score: #2a242a;
+    --bg-time:  #1e2530;
+    --border: #3a3f4d; --border-h: #5a6075; --border-active: #f0d050;
+    --txt: #e8e8ea; --txt-dim: #8088a0; --txt-mid: #aab0c0;
+    /* data-type socket colors */
+    --t-usd:    #50b450;  /* USD scene / 3D */
+    --t-image:  #f0d050;  /* keyframe image (RGB) */
+    --t-inbtw:  #c890ff;  /* inbetween synth frame */
+    --t-cnet:   #50c0d0;  /* ControlNet conditioning */
+    --t-pose:   #ff90b0;  /* pose / skeleton */
+    --t-cam:    #ffa050;  /* camera params (time-stamped) */
+    --t-emot:   #ff70a0;  /* emotion */
+    --t-latent: #d050a0;  /* latent */
+    --t-text:   #ffffff;  /* prompt */
+    --t-model:  #b070d0;  /* model / VLM */
+    --t-score:  #e06060;  /* score */
+    --t-cut:    #80c8ff;  /* cut composite (mp4) */
+    --t-state:  #707888;  /* LangGraph state */
+    --t-ctrl:   #6a728a;  /* control flow */
+    --t-time:   #506080;  /* time axis */
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg-canvas); color: var(--txt); margin: 0;
+               font: 12px/1.4 -apple-system, "Helvetica Neue", sans-serif;
+               overflow: hidden; height: 100%; }
+
+  .topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+            padding: 8px 16px; background: rgba(20,22,27,0.92);
+            backdrop-filter: blur(6px);
+            border-bottom: 1px solid var(--border); display: flex;
+            align-items: center; gap: 14px; flex-wrap: wrap; }
+  .topbar h1 { font-size: 14px; margin: 0; font-weight: 600;
+               font-family: ui-monospace, monospace; color: #fff; }
+  .topbar .sub { color: var(--txt-dim); font-size: 11px;
+                 font-family: ui-monospace, monospace; }
+  .topbar .ctl { display: flex; align-items: center; gap: 8px;
+                 font-size: 11px; color: var(--txt-mid); }
+  .topbar select, .topbar button, .topbar a.vbtn {
+    background: var(--bg-node); color: var(--txt); border: 1px solid var(--border);
+    border-radius: 4px; padding: 4px 8px; font-size: 11px;
+    font-family: ui-monospace, monospace; cursor: pointer;
+    text-decoration: none; }
+  .topbar select:hover, .topbar button:hover, .topbar a.vbtn:hover { background: var(--bg-node-h); }
+  .topbar a.vbtn.active { border-color: var(--border-active); color: #fff; }
+  .topbar .legend { display: flex; gap: 12px; flex-wrap: wrap;
+                    font-size: 10px; color: var(--txt-dim); margin-left: auto; }
+  .topbar .legend i { display: inline-block; width: 14px; height: 3px;
+                      vertical-align: middle; margin-right: 4px;
+                      border-radius: 2px; }
+  .topbar .legend.dashed i { height: 0; border-top: 2px dashed; background: none; }
+
+  .layout { position: absolute; inset: 50px 0 0 0; display: flex; }
+  .sidebar { width: 280px; flex-shrink: 0; background: #14141a;
+             border-right: 1px solid var(--border); overflow-y: auto;
+             padding: 8px 0; font-size: 12px; }
+  .sb-title { padding: 4px 12px 8px; font-size: 10px;
+              text-transform: uppercase; letter-spacing: 0.06em;
+              color: var(--txt-dim); border-bottom: 1px solid var(--border); }
+  .sb-section { padding: 8px 0 4px; }
+  .sb-section-h { padding: 4px 12px; font-size: 9px;
+                   text-transform: uppercase; letter-spacing: 0.06em;
+                   color: #d8a830; }
+  .sb-item { display: block; padding: 4px 12px; color: var(--txt-dim);
+             text-decoration: none; cursor: pointer; font-size: 11px;
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+             border-left: 2px solid transparent; }
+  .sb-item:hover { background: #1a1a22; color: var(--txt); }
+  .sb-item.active { background: #2a2a33; color: var(--txt);
+                     border-left-color: #d8a830; }
+
+  .viewport { position: relative; flex: 1; overflow: hidden;
+              cursor: grab;
+              background-image:
+                linear-gradient(var(--grid) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+                linear-gradient(var(--grid-major) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-major) 1px, transparent 1px);
+              background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
+              background-position: 0 0; }
+  .viewport.dragging { cursor: grabbing; }
+  .world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+
+  svg.edges { position: absolute; left: 0; top: 0; overflow: visible;
+              pointer-events: none; }
+  svg.edges path.edge { fill: none; stroke-width: 2; opacity: 0.85; }
+  svg.edges path.edge.ctrl { stroke-dasharray: 5 4; stroke-width: 1.5;
+                              opacity: 0.55; stroke: var(--t-ctrl); }
+  svg.edges path.edge.cond { stroke-dasharray: 7 4; }
+  svg.edges path.edge.timewire { stroke-dasharray: 2 3; opacity: 0.4;
+                                  stroke: var(--t-time); stroke-width: 1; }
+  svg.edges path.edge:hover { opacity: 1; stroke-width: 3; }
+  svg.edges text.edge-lbl { fill: var(--txt-dim); font: 9px ui-monospace, monospace;
+                             paint-order: stroke; stroke: var(--bg-canvas);
+                             stroke-width: 3; }
+
+  .node { position: absolute; background: var(--bg-node);
+          border: 1px solid var(--border); border-radius: 8px;
+          overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+          transition: border-color 0.15s, transform 0.15s; }
+  .node:hover { border-color: var(--border-h); }
+  .node.control { background: var(--bg-control); }
+  .node.score { background: var(--bg-score); }
+  .node.time { background: var(--bg-time); }
+  .node.active { border-color: var(--border-active); box-shadow:
+       0 0 0 2px rgba(240, 208, 80, 0.25), 0 4px 14px rgba(0,0,0,0.5);
+       animation: pulse 2.2s ease-in-out infinite; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(240,208,80,0.30), 0 4px 14px rgba(0,0,0,0.5); }
+    50%      { box-shadow: 0 0 0 8px rgba(240,208,80,0.00), 0 4px 14px rgba(0,0,0,0.5); }
+  }
+  .node-h { display: flex; align-items: center; gap: 6px;
+            padding: 5px 10px; background: var(--bg-header);
+            font: 600 11px ui-monospace, monospace; color: var(--txt); }
+  .node.control .node-h { background: #2a3548; }
+  .node.time    .node-h { background: #28303c; color: #b8c4d6; }
+  .node-h .badge { font-size: 9px; padding: 1px 5px; border-radius: 3px;
+                   background: var(--border); color: var(--txt-mid);
+                   text-transform: uppercase; letter-spacing: 0.04em;
+                   margin-left: auto; }
+  .node-h .badge.send { background: #3a4a66; color: #87b3ff; }
+  .node-h .badge.cond { background: #4a4030; color: #ffd460; }
+  .node-h .badge.time { background: #2a3540; color: #80a8d0; }
+  .node-h .badge.ok   { background: #2a4a2a; color: #50b450; }
+  .node-h .badge.warn { background: #4a3a2a; color: #f0a040; }
+  .node-h .badge.bad  { background: #4a2a2a; color: #e07030; }
+  .node-h .badge.crit { background: #4a2020; color: #c84040; }
+  .node-b { padding: 8px 10px; font-size: 10px; color: var(--txt-mid);
+            line-height: 1.4; font-family: ui-monospace, monospace;
+            word-break: break-word; }
+  .node-img { background: #000; display: block; }
+  .node-img img, .node-img video { display: block; width: 100%;
+                                    height: 100%; object-fit: contain; cursor: pointer; }
+  .placeholder { display: flex; align-items: center; justify-content: center;
+                 color: #4a4f5d; font-size: 10px; font-style: italic;
+                 background: repeating-linear-gradient(45deg,
+                   #1a1d24 0, #1a1d24 6px, #1f222a 6px, #1f222a 12px);
+                 white-space: pre-line; text-align: center; padding: 4px; }
+  .placeholder.synth {
+    background: repeating-linear-gradient(45deg,
+      #1d1a24 0, #1d1a24 6px, #221f2a 6px, #221f2a 12px);
+    color: #6a5878;
+  }
+  .axes { display: grid; grid-template-columns: 1fr 32px; gap: 1px 6px;
+          margin-top: 4px; font-family: ui-monospace, monospace; }
+  .axes .ax { display: contents; }
+  .axes .ax .n { font-size: 9px; color: var(--txt-mid);
+                 overflow: hidden; text-overflow: ellipsis;
+                 white-space: nowrap; padding: 1px 0; }
+  .axes .ax .v { font-size: 9px; text-align: right;
+                 font-variant-numeric: tabular-nums; padding: 1px 0; }
+  .axes .bar { grid-column: 1/3; height: 3px; background: #1a1d24;
+               border-radius: 2px; overflow: hidden; margin: 1px 0 3px;
+               position: relative; }
+  .axes .bar > i { position: absolute; left: 0; top: 0; bottom: 0;
+                   border-radius: 2px; }
+
+  /* time-axis ruler node */
+  .ruler {
+    background: linear-gradient(to bottom, #1e2530 0, #14161b 100%);
+    border: 1px solid #2c3340;
+    border-radius: 6px;
+    position: absolute;
+    color: #80a8d0;
+    font: 10px ui-monospace, monospace;
+    padding: 6px 8px;
+    overflow: hidden;
+  }
+  .ruler .tick { position: absolute; top: 24px; bottom: 4px; width: 1px;
+                 background: rgba(120,140,180,0.35); }
+  .ruler .tick.major { background: rgba(150,170,210,0.7); }
+  .ruler .tlbl { position: absolute; font-size: 9px; color: #b8c4d6;
+                 transform: translateX(-50%); top: 6px; white-space: nowrap; }
+  .ruler .kfmark { position: absolute; top: 22px; width: 8px; height: 8px;
+                   border-radius: 50%; background: var(--t-image);
+                   transform: translate(-50%, -50%); border: 2px solid #14161b;
+                   box-shadow: 0 0 6px rgba(240,208,80,0.6); }
+  .ruler .imark { position: absolute; top: 22px; width: 5px; height: 5px;
+                  border-radius: 50%; background: var(--t-inbtw);
+                  transform: translate(-50%, -50%); border: 1px solid #14161b; }
+
+  .sock { position: absolute; width: 10px; height: 10px;
+          border-radius: 50%; border: 2px solid var(--bg-canvas);
+          z-index: 3; transform: translate(-50%, -50%); }
+  .sock-l { left: 0; }
+  .sock-r { left: 100%; }
+  .sock-lbl { position: absolute; font: 9px ui-monospace, monospace;
+              color: var(--txt-dim); white-space: nowrap;
+              pointer-events: none; }
+
+  .lb { position: fixed; inset: 0; background: rgba(0,0,0,0.96);
+        display: none; align-items: center; justify-content: center; z-index: 200; }
+  .lb.open { display: flex; }
+  .lb img, .lb video { max-width: 95vw; max-height: 95vh; }
+  .lb-close { position: fixed; top: 14px; right: 22px; color: #fff;
+              font-size: 28px; cursor: pointer; user-select: none; }
+  .lb-cap { position: fixed; bottom: 14px; left: 50%;
+            transform: translateX(-50%); color: #aaa; font-size: 11px;
+            font-family: ui-monospace, monospace;
+            background: rgba(0,0,0,0.7); padding: 6px 12px; border-radius: 4px; }
+  .hint { position: fixed; bottom: 12px; right: 16px; z-index: 50;
+          color: var(--txt-dim); font-size: 10px;
+          font-family: ui-monospace, monospace;
+          background: rgba(20,22,27,0.85); padding: 6px 12px;
+          border: 1px solid var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>animeka_full_pipeline_v9</h1>
+  <span class="sub" id="sub">USD cut atom · time-axis · ADR-2605222000</span>
+  <span class="ctl">cut
+    <select id="cut-sel">
+      <option value="0" selected>cut01 — anime-bedroom · MS · ZOOM_IN d=12</option>
+      <option value="1">cut02 — anime-classroom · LS · PAN_R d=8</option>
+      <option value="2">cut03 — anime-bedroom · CU · TU d=6</option>
+      <option value="3">cut04 — anime-classroom · TWO · TILT_UP d=8</option>
+      <option value="4">cut05 — anime-shrine · ELS · TB d=8</option>
+      <option value="5">cut06 — anime-rooftop · ECU · PAN_L d=6</option>
+    </select>
+  </span>
+  <span class="ctl">
+    <a class="vbtn" href="/?v=6#p03" title="mangaka page-atom v5/v6">← mangaka v6 (page)</a>
+    <a class="vbtn active" href="/v9-anime.html" title="animeka cut-atom v9">anime v9 (cut)</a>
+    <a class="vbtn" href="#scene5s" title="5-second scene preview (4 cuts + synth BGM + handcrafted SFX)" id="scene-btn">▶ 5s</a>
+    <a class="vbtn" href="#scene42s" title="42-second 6-cut episode scene with MMAudio video-synced SFX + edge-tts dialogue + BGM" id="scene42-btn" style="border-color:#5ab0ff;color:#fff;">▶ 42s episode</a>
+    <a class="vbtn" href="#ipfs" title="Show IPFS CIDs for all 10 videos (publicly fetchable via ipfs.io)" id="ipfs-btn" style="border-color:#50c0d0;color:#a8e0e8;">⌬ IPFS</a>
+  </span>
+  <button id="fit">⤧ fit</button>
+  <button id="reset">⟲ reset</button>
+  <div class="legend">
+    <span><i style="background:var(--t-usd)"></i>USD/3D</span>
+    <span><i style="background:var(--t-cam)"></i>camera_params(frame)</span>
+    <span><i style="background:var(--t-pose)"></i>pose</span>
+    <span><i style="background:var(--t-emot)"></i>emotion</span>
+    <span><i style="background:var(--t-cnet)"></i>ControlNet</span>
+    <span><i style="background:var(--t-image)"></i>keyframe</span>
+    <span><i style="background:var(--t-inbtw)"></i>inbetween</span>
+    <span><i style="background:var(--t-cut)"></i>cut(mp4)</span>
+    <span><i style="background:var(--t-score)"></i>score</span>
+    <span class="dashed"><i style="border-color:var(--t-ctrl)"></i>control flow</span>
+    <span class="dashed"><i style="border-color:var(--t-time)"></i>time-stamp</span>
+  </div>
+</div>
+
+<div class="layout">
+  <aside id="sidebar" class="sidebar">
+    <div class="sb-title">Cuts (this episode)</div>
+    <div id="sb-list"></div>
+    <div class="sb-title" style="margin-top:8px;">v3 USD nodes (16)</div>
+    <div style="padding:6px 12px;font-size:10px;color:var(--txt-dim);line-height:1.6;">
+      <div style="color:#c8cad4;margin-bottom:2px;">13 USD/cinematic</div>
+      AnimekaUSDLoader · USDInspect · USDLight · USDMaterial<br>
+      USDCameraPrim · USDReference · CameraView · CameraViewFromParams<br>
+      ShotComposition · PoseFromLibrary · ProjectPose<br>
+      CharacterEmotion · PromptConcat
+      <div style="color:#c890ff;margin-top:8px;margin-bottom:2px;">3 time-axis (anime-only)</div>
+      AnimekaCameraKeyframe(frame_num)<br>
+      AnimekaInterpolateCameras(t∈[0,1])<br>
+      AnimekaCameraMovePreset(TU/PAN/TB/TILT/ZOOM)
+    </div>
+  </aside>
+  <div class="viewport" id="viewport">
+    <div class="world" id="world">
+      <svg class="edges" id="edges"></svg>
+      <div id="nodes"></div>
+    </div>
+  </div>
+</div>
+
+<div class="hint">drag = pan · wheel = zoom · click image = open</div>
+
+<div class="lb" onclick="this.classList.remove('open')">
+  <div class="lb-close" onclick="event.stopPropagation();document.querySelector('.lb').classList.remove('open')">✕</div>
+  <img id="lbimg" src="" style="display:none">
+  <video id="lbvid" src="" controls style="display:none"></video>
+  <div class="lb-cap" id="lbcap"></div>
+</div>
+
+<script>
+//──────────────────────────────────────────────────────────────────────
+// animeka v3 cut pipeline — LangGraph control strip (cut atom)
+//──────────────────────────────────────────────────────────────────────
+// Mirrors lg/scripts/render-cut-v3.py + com.etzhayyim.animeka.cutRunner pod loop.
+// 12-stage anime production (60-apps/.../animeka/CLAUDE.md) collapsed
+// to the per-cut keyframe+inbetween+composite control flow.
+const CONTROL_NODES = [
+  { id: "c_start",        kind:"control", x:    0, y: 0, w:  80, h: 50, title: "START",            badge: "start" },
+  { id: "c_plan_cut",     kind:"control", x:  110, y: 0, w: 130, h: 50, title: "plan_cut",         badge: "py"   },
+  { id: "c_enrich_usd",   kind:"control", x:  270, y: 0, w: 150, h: 50, title: "enrich_scene_usd", badge: "subproc" },
+  { id: "c_kf_camera",    kind:"control", x:  450, y: 0, w: 170, h: 50, title: "keyframe_camera",  badge: "send×K"  },
+  { id: "c_kf_render",    kind:"control", x:  650, y: 0, w: 170, h: 50, title: "render_keyframe",  badge: "send×K" },
+  { id: "c_vision_qa",    kind:"control", x:  850, y: 0, w: 140, h: 50, title: "vision_qa",        badge: "api" },
+  { id: "c_branch",       kind:"control", x: 1020, y: 0, w: 150, h: 50, title: "_needs_retry",     badge: "cond" },
+  { id: "c_interp",       kind:"control", x: 1200, y: 0, w: 180, h: 50, title: "interpolate_inbetween", badge: "send×N" },
+  { id: "c_composite",    kind:"control", x: 1410, y: 0, w: 150, h: 50, title: "composite_cut",    badge: "py" },
+  { id: "c_ffmpeg",       kind:"control", x: 1590, y: 0, w: 140, h: 50, title: "ffmpeg_encode",    badge: "subproc" },
+  { id: "c_save",         kind:"control", x: 1760, y: 0, w: 140, h: 50, title: "save_artifact",    badge: "py" },
+  { id: "c_end",          kind:"control", x: 1930, y: 0, w:  80, h: 50, title: "END",              badge: "end" },
+];
+const CONTROL_EDGES = [
+  ["c_start","c_plan_cut"], ["c_plan_cut","c_enrich_usd"],
+  ["c_enrich_usd","c_kf_camera"], ["c_kf_camera","c_kf_render"],
+  ["c_kf_render","c_vision_qa"], ["c_vision_qa","c_branch"],
+  ["c_branch","c_interp",   {label:"ok"}],
+  ["c_branch","c_kf_render",{label:"retry ↺", cond:true, curve:"loop"}],
+  ["c_interp","c_composite"], ["c_composite","c_ffmpeg"],
+  ["c_ffmpeg","c_save"], ["c_save","c_end"],
+];
+
+//──────────────────────────────────────────────────────────────────────
+// Per-cut data (mocked from ADR-2605222000 + animeka CLAUDE.md examples)
+//──────────────────────────────────────────────────────────────────────
+// Real data plug-in: replace CUTS[] with `com.etzhayyim.animeka.listCuts` XRPC
+// response + per-cut `keyframe` / `inbetween` / `composite` records.
+const CUTS = [
+  {
+    name: "cut01", scene: "anime-bedroom", shot: "MS", angle: "low", rule: "thirds_R",
+    pose: "anxious_at_desk", emotion: "determined", intensity: 0.8,
+    move: "ZOOM_IN", moveDist: 12, durationFrames: 12, fps: 24,
+    keyframes: [
+      { frame: 1,  cam: { ox:-2.1, oy:1.2, oz:3.0, tx:0, ty:0.8, tz:0, fov: 36 }, file: "animeka-cut01-f1.png" },
+      { frame: 6,  cam: { ox:-1.3, oy:1.2, oz:2.1, tx:0, ty:0.8, tz:0, fov: 30 }, file: "animeka-cut01-f6.png" },
+      { frame: 12, cam: { ox:-0.6, oy:1.2, oz:1.2, tx:0, ty:0.8, tz:0, fov: 24 }, file: "animeka-cut01-f12.png" },
+    ],
+    inbetweens: [
+      { frame: 3,  between: [1,6],  file: "animeka-cut01-f3.png"  },
+      { frame: 4,  between: [1,6],  file: "animeka-cut01-f4.png"  },
+      { frame: 8,  between: [6,12], file: "animeka-cut01-f8.png"  },
+      { frame: 10, between: [6,12], file: "animeka-cut01-f10.png" },
+    ],
+    cutVideo: "animeka-cut01-mma.mp4",  // ZOOM_IN ramp + MMAudio wind/bird ambience
+    score: { total: 81.4, label: "broadcast tier",
+      scores: {
+        character_visible: 9, scene_continuity: 9, camera_smoothness: 8,
+        pose_consistency: 7, emotion_match: 8, controlnet_fidelity: 9,
+        keyframe_density: 7, inbetween_quality: 7, motion_arc: 8,
+        lighting_continuity: 9, lipsync_slot: 6, audio_slot_ready: 6,
+      },
+      version_tag: "v3+USD+CN×3",
+    },
+  },
+  {
+    name: "cut02", scene: "anime-classroom", shot: "LS", angle: "eye_level", rule: "thirds_L",
+    pose: "standing_facing_camera", emotion: "neutral", intensity: 0.4,
+    move: "PAN_R", moveDist: 18, durationFrames: 8, fps: 24,
+    keyframes: [
+      { frame: 1, cam: { ox:0, oy:1.6, oz:5.4, tx:-0.4, ty:1.2, tz:0, fov: 50 }, file: "animeka-cut02-f1.png" },
+      { frame: 8, cam: { ox:0, oy:1.6, oz:5.4, tx: 0.9, ty:1.2, tz:0, fov: 50 }, file: "animeka-cut02-f8.png" },
+    ],
+    cutVideo: "animeka-cut02-mma.mp4",  // PAN_R + MMAudio classroom ambience
+    inbetweens: [
+      { frame: 2, between:[1,8] }, { frame: 4, between:[1,8] },
+      { frame: 6, between:[1,8] },
+    ],
+    score: { total: 74.0, label: "mid tier",
+      scores: {
+        character_visible: 8, scene_continuity: 9, camera_smoothness: 9,
+        pose_consistency: 6, emotion_match: 6, controlnet_fidelity: 8,
+        keyframe_density: 5, inbetween_quality: 7, motion_arc: 9,
+        lighting_continuity: 8, lipsync_slot: 5, audio_slot_ready: 5,
+      },
+      version_tag: "v3+USD+CN×3",
+    },
+    cutVideoNull: null,
+  },
+  {
+    name: "cut03", scene: "anime-bedroom", shot: "CU", angle: "low", rule: "center",
+    pose: "looking_at_phone", emotion: "anxious", intensity: 1.2,
+    move: "TU", moveDist: 0.8, durationFrames: 6, fps: 24,
+    keyframes: [
+      { frame: 1, cam: { ox:-0.4, oy:0.6, oz:0.9, tx:0, ty:0.9, tz:0, fov: 28 }, file: "animeka-cut03-f1.png" },
+      { frame: 6, cam: { ox:-0.4, oy:1.4, oz:0.9, tx:0, ty:0.9, tz:0, fov: 28 }, file: "animeka-cut03-f6.png" },
+    ],
+    cutVideo: "animeka-cut03-mma.mp4",  // TU + MMAudio phone notif/room tone
+    inbetweens: [
+      { frame: 2, between:[1,6] }, { frame: 3, between:[1,6] },
+      { frame: 4, between:[1,6] }, { frame: 5, between:[1,6] },
+    ],
+    score: null,  // not yet QA'd
+    cutVideoNull: null,
+  },
+  {
+    name: "cut04", scene: "anime-classroom", shot: "TWO", angle: "eye_level", rule: "symmetry",
+    pose: "talking_animated", emotion: "joyful", intensity: 0.9,
+    move: "TILT_UP", moveDist: 8, durationFrames: 8, fps: 24,
+    keyframes: [
+      { frame: 1, cam: { ox:0, oy:1.5, oz:4.0, tx:0, ty:1.2, tz:0, fov: 42 }, file: "animeka-cut04-f1.png" },
+      { frame: 8, cam: { ox:0, oy:1.5, oz:4.0, tx:0, ty:1.8, tz:0, fov: 42 }, file: "animeka-cut04-f8.png" },
+    ],
+    cutVideo: "animeka-cut04-mma.mp4",  // TILT_UP + MMAudio laughter/chatter
+    inbetweens: [
+      { frame: 3, between:[1,8] }, { frame: 5, between:[1,8] },
+    ],
+    score: null,
+    cutVideoNull: null,
+  },
+  {
+    name: "cut05", scene: "anime-shrine", shot: "ELS", angle: "high", rule: "thirds_top_R",
+    pose: "walking_running", emotion: "contemplative", intensity: 0.5,
+    move: "TB", moveDist: 4.0, durationFrames: 8, fps: 24,
+    keyframes: [
+      { frame: 1, cam: { ox:8, oy:6, oz:14, tx:0, ty:2, tz:0, fov: 60 }, file: "animeka-cut05-f1.png" },
+      { frame: 6, cam: { ox:8, oy:6, oz:18, tx:0, ty:2, tz:0, fov: 60 }, file: "animeka-cut05-f6.png" },
+    ],
+    inbetweens: [
+      { frame: 3, between:[1,6] },
+    ],
+    score: null,
+    cutVideo: "animeka-cut05-mma.mp4",
+  },
+  {
+    name: "cut06", scene: "anime-rooftop", shot: "ECU", angle: "dutch_R", rule: "center",
+    pose: "anxious_at_desk", emotion: "sad", intensity: 1.4,
+    move: "PAN_L", moveDist: 6, durationFrames: 6, fps: 24,
+    keyframes: [
+      { frame: 1, cam: { ox:0.1, oy:1.6, oz:0.4, tx:0, ty:1.55, tz:0, fov: 20 }, file: "animeka-cut06-f1.png" },
+      { frame: 6, cam: { ox:0.1, oy:1.6, oz:0.4, tx:-0.1, ty:1.55, tz:0, fov: 20 }, file: "animeka-cut06-f6.png" },
+    ],
+    inbetweens: [
+      { frame: 3, between:[1,6] }, { frame: 4, between:[1,6] },
+    ],
+    score: null,
+    cutVideo: "animeka-cut06-mma.mp4",
+  },
+];
+
+const SCENE_USDA_REF = {
+  "anime-bedroom":   { prims: 22,  cams: 5, lights: 3 },
+  "anime-classroom": { prims: 270, cams: 5, lights: 5 },
+  "anime-shrine":    { prims: "?", cams: "?", lights: "?" },  // forward-only, ADR-2605222000
+  "anime-rooftop":   { prims: "?", cams: "?", lights: "?" },  // forward-only, ADR-2605222000
+};
+
+//──────────────────────────────────────────────────────────────────────
+// Tensor graph builder (cut atom)
+//──────────────────────────────────────────────────────────────────────
+function buildCutGraph(cutIdx) {
+  const cut = CUTS[cutIdx] || CUTS[0];
+  const scene = SCENE_USDA_REF[cut.scene] || { prims: "?", cams: "?", lights: "?" };
+
+  // Layout: time-axis horizontal swimlane in the middle.
+  // Per keyframe: vertical column at x = TIME_START + frame * PX_PER_FRAME * SCALE.
+  // Top region: shared USD + pose + emotion + prompt nodes.
+  // Bottom region: per-keyframe render (img) + inbetween (synth img) + composite + qa + final.
+  const TOP        = 110;
+  const SCENE_X    = 0;
+  const SHARED_W   = 240;
+  const SHARED_GAP = 230;
+  const TIME_START = 880;     // x where frame=0 maps to
+  const PX_PER_F   = 80;      // px per frame
+  const TIME_END   = TIME_START + (cut.durationFrames + 1) * PX_PER_F;
+  const KF_ROW_Y   = TOP + 280;   // keyframe render image row
+  const INTERP_Y   = TOP + 540;   // inbetween synth row
+  const RULER_Y    = TOP + 220;   // time ruler band
+  const COMP_X     = TIME_END + 60;
+  const QA_X       = COMP_X + 320;
+  const FINAL_X    = QA_X + 320;
+
+  const nodes = [];
+  const edges = [];
+  const ctrlEdges = [];
+
+  // ── Shared inputs (left column) ──────────────────────────────────
+  nodes.push({
+    id: "n_usd", kind: "data", x: SCENE_X, y: TOP, w: SHARED_W, h: 140,
+    title: `usd_scene · ${cut.scene}`, badge: "USD",
+    sub: `prims=${scene.prims}  cams=${scene.cams}  lights=${scene.lights}\n` +
+         `data/animeka/resources/usd/${cut.scene}.usda\n` +
+         `AnimekaUSDLoader → ANIMEKA_SCENE`,
+    outputs: [
+      { id: "scene_out", name: "scene", color: "var(--t-usd)" },
+    ],
+  });
+  nodes.push({
+    id: "n_shot", kind: "data", x: SCENE_X, y: TOP + 160, w: SHARED_W, h: 110,
+    title: `shot_composition`, badge: "CINE",
+    sub: `shot=${cut.shot}  angle=${cut.angle}\nrule=${cut.rule}\nAnimekaShotComposition → camera_params`,
+    outputs: [
+      { id: "shot_out", name: "cam0", color: "var(--t-cam)" },
+    ],
+  });
+  nodes.push({
+    id: "n_pose", kind: "data", x: SCENE_X, y: TOP + 290, w: SHARED_W, h: 100,
+    title: `pose_library`, badge: "POSE",
+    sub: `pose=${cut.pose}\nBODY_18 / COCO 18-kp\nshared with mangaka v3`,
+    outputs: [
+      { id: "pose_out", name: "pose", color: "var(--t-pose)" },
+    ],
+  });
+  nodes.push({
+    id: "n_emot", kind: "data", x: SCENE_X, y: TOP + 410, w: SHARED_W, h: 90,
+    title: `character_emotion`, badge: "EMOT",
+    sub: `emotion=${cut.emotion}  intensity=${cut.intensity}\nface_prompt + body_modifier`,
+    outputs: [
+      { id: "emot_out", name: "emotion", color: "var(--t-emot)" },
+    ],
+  });
+  nodes.push({
+    id: "n_prompt", kind: "data", x: SCENE_X, y: TOP + 520, w: SHARED_W, h: 90,
+    title: `prompt_concat`, badge: "TEXT",
+    sub: `base + emotion + body + lighting\n+ material + LoRA tag`,
+    inputs: [
+      { id: "scene_in", name: "scene",   color: "var(--t-usd)" },
+      { id: "emot_in",  name: "emotion", color: "var(--t-emot)" },
+    ],
+    outputs: [
+      { id: "prompt_out", name: "prompt", color: "var(--t-text)" },
+    ],
+  });
+  nodes.push({
+    id: "n_vlm", kind: "data", x: SCENE_X, y: TOP + 630, w: SHARED_W, h: 80,
+    title: `vision_qa.model`, badge: "VLM",
+    sub: `gemma3:4b  (Ollama)\n12-axis cut score (motion + lighting +\nemotion + camera_smoothness …)`,
+    outputs: [
+      { id: "vlm_out", name: "model", color: "var(--t-model)" },
+    ],
+  });
+
+  // ── Camera-move preset band (spans the time axis) ────────────────
+  nodes.push({
+    id: "n_move", kind: "data", x: TIME_START - 20, y: TOP, w: (cut.durationFrames + 1) * PX_PER_F + 40, h: 95,
+    title: `AnimekaCameraMovePreset · ${cut.move}  dist=${cut.moveDist}`,
+    badge: "MOVE",
+    sub: `duration_frames=${cut.durationFrames}  fps=${cut.fps}\n→ [start_camera, end_camera] pair\n→ AnimekaInterpolateCameras(t = n/dur) per frame`,
+    inputs: [
+      { id: "shot_in", name: "cam0", color: "var(--t-cam)" },
+    ],
+    outputs: cut.keyframes.map((kf, i) => ({
+      id: `cam_${kf.frame}`, name: `f=${kf.frame}`, color: "var(--t-cam)",
+    })),
+  });
+
+  // ── Time ruler (decorative time axis) ────────────────────────────
+  // A "ruler" pseudo-node — we render a special DOM block instead of a
+  // standard node by tagging it with kind="ruler".
+  nodes.push({
+    id: "n_ruler", kind: "ruler", x: TIME_START - 20, y: RULER_Y,
+    w: (cut.durationFrames + 1) * PX_PER_F + 40, h: 44,
+    durationFrames: cut.durationFrames, fps: cut.fps,
+    keyframes: cut.keyframes, inbetweens: cut.inbetweens,
+    pxPerFrame: PX_PER_F, leftPad: 20,
+  });
+
+  // ── Per-keyframe camera + render ─────────────────────────────────
+  cut.keyframes.forEach((kf, i) => {
+    const cx = TIME_START + kf.frame * PX_PER_F;
+    // CameraKeyframe node (small, sits just below ruler)
+    nodes.push({
+      id: `n_kfcam_${kf.frame}`, kind: "time", x: cx - 75, y: RULER_Y + 70,
+      w: 150, h: 100,
+      title: `CameraKeyframe f=${kf.frame}`, badge: "time",
+      sub: `o=(${kf.cam.ox},${kf.cam.oy},${kf.cam.oz})\nt=(${kf.cam.tx},${kf.cam.ty},${kf.cam.tz})\nfov=${kf.cam.fov}°`,
+      inputs: [
+        { id: "cam_in",   name: "cam(f)", color: "var(--t-cam)" },
+        { id: "scene_in", name: "scene",  color: "var(--t-usd)" },
+      ],
+      outputs: [
+        { id: "depth",  name: "depth",  color: "var(--t-cnet)" },
+        { id: "canny",  name: "canny",  color: "var(--t-cnet)" },
+        { id: "openps", name: "openpose", color: "var(--t-pose)" },
+      ],
+    });
+
+    // Keyframe render image (large, anchored at time).
+    // If a real PNG exists in /img/, load it; otherwise show placeholder.
+    nodes.push({
+      id: `n_kf_${kf.frame}`, kind: "data", x: cx - 110, y: KF_ROW_Y,
+      w: 220, h: 230,
+      title: `keyframe f=${kf.frame}`, badge: kf.file ? "KEY" : "KEY",
+      file: kf.file || null,
+      placeholder: kf.file ? null : `Animagine XL 4.0\n+ LoRA @ 0.55\n+ canny 0.35 / depth 0.25\n+ openpose 0.65\n→ /tmp/v3-cut-${cut.name}-f${kf.frame}.png`,
+      sub: kf.file ? null : `35 steps · dpmpp_2m_sde · cfg 7.0\n1024×1024  ~80 s/keyframe`,
+      inputs: [
+        { id: "prompt_in", name: "prompt",   color: "var(--t-text)" },
+        { id: "depth_in",  name: "depth",    color: "var(--t-cnet)" },
+        { id: "canny_in",  name: "canny",    color: "var(--t-cnet)" },
+        { id: "pose_in",   name: "openpose", color: "var(--t-pose)" },
+      ],
+      outputs: [
+        { id: "img", name: "kf(f)", color: "var(--t-image)" },
+      ],
+    });
+  });
+
+  // ── Inbetween synth row ──────────────────────────────────────────
+  cut.inbetweens.forEach((ib) => {
+    const cx = TIME_START + ib.frame * PX_PER_F;
+    nodes.push({
+      id: `n_ib_${ib.frame}`, kind: "data", x: cx - 75, y: INTERP_Y,
+      w: 150, h: 170,
+      title: `inbetween f=${ib.frame}`, badge: "INTRP",
+      file: ib.file || null,
+      placeholderClass: "synth",
+      placeholder: ib.file ? null : `InterpolateCameras\n  t = ${((ib.frame - ib.between[0]) / (ib.between[1] - ib.between[0])).toFixed(2)}\ninbetweener LoRA blend\n(prevKey f=${ib.between[0]},\n nextKey f=${ib.between[1]})`,
+      inputs: [
+        { id: "prev_in", name: `kf(${ib.between[0]})`, color: "var(--t-image)" },
+        { id: "next_in", name: `kf(${ib.between[1]})`, color: "var(--t-image)" },
+      ],
+      outputs: [
+        { id: "img", name: `ib(${ib.frame})`, color: "var(--t-inbtw)" },
+      ],
+    });
+  });
+
+  // ── Composite cut (mp4 join) ─────────────────────────────────────
+  const totalFrames = cut.keyframes.length + cut.inbetweens.length;
+  nodes.push({
+    id: "n_comp", kind: "data", x: COMP_X, y: KF_ROW_Y, w: 300, h: 250,
+    title: `composite_cut`, badge: cut.cutVideo ? "MP4" : "JOIN",
+    file: cut.cutVideo || null,
+    placeholder: cut.cutVideo ? null : `ffmpeg concat\n${totalFrames}/${cut.durationFrames} frames\n@ ${cut.fps} fps\n→ vertex_animeka.cut.image_cid`,
+    sub: cut.cutVideo
+      ? `ffmpeg minterpolate (mci+aobmc)\n${cut.durationFrames}f @ ${cut.fps}fps\nfrom ${cut.keyframes.length} real keyframes`
+      : `mp4 + cover PNG\n+ vertex_animeka.keyframe × ${cut.keyframes.length}\n+ vertex_animeka.inbetween × ${cut.inbetweens.length}`,
+    inputs: [
+      ...cut.keyframes.map((kf, i) => ({
+        id: `kf_in_${kf.frame}`, name: `kf(${kf.frame})`, color: "var(--t-image)",
+      })),
+      ...cut.inbetweens.map((ib, i) => ({
+        id: `ib_in_${ib.frame}`, name: `ib(${ib.frame})`, color: "var(--t-inbtw)",
+      })),
+    ],
+    outputs: [
+      { id: "out", name: "cut", color: "var(--t-cut)" },
+    ],
+  });
+
+  // ── Vision QA ────────────────────────────────────────────────────
+  nodes.push({
+    id: "n_qa", kind: "score", x: QA_X, y: KF_ROW_Y, w: 300, h: 250,
+    title: `vision_qa`, badge: cut.score ? scoreBadgeClass(cut.score.total) : "api",
+    score: cut.score, sub: cut.score ? null : "no QA score yet for this cut",
+    inputs: [
+      { id: "cut_in",  name: "cut",   color: "var(--t-cut)" },
+      { id: "model_in", name: "VLM", color: "var(--t-model)" },
+    ],
+    outputs: [
+      { id: "score_out", name: "score", color: "var(--t-score)" },
+    ],
+  });
+
+  // ── Final artifact ───────────────────────────────────────────────
+  nodes.push({
+    id: "n_final", kind: "data", x: FINAL_X, y: KF_ROW_Y, w: 280, h: 250,
+    title: `save_artifact (cut)`, badge: "ARTIFACT",
+    placeholder: cut.cutVideo
+      ? `${cut.cutVideo}`
+      : `vertex_animeka.cut\n.image_cid (cover)\n+ mp4 blob\n+ keyframe/inbetween rows`,
+    sub: `B2 content-addressed blob\nat://${"<authority>"}/com.etzhayyim.animeka.cut/${cut.name}`,
+    inputs: [
+      { id: "comp_in",  name: "cut",   color: "var(--t-cut)" },
+      { id: "score_in", name: "score", color: "var(--t-score)" },
+    ],
+  });
+
+  // ── DATA EDGES ───────────────────────────────────────────────────
+  edges.push(["n_usd",  "scene_out", "n_prompt", "scene_in"]);
+  edges.push(["n_emot", "emot_out",  "n_prompt", "emot_in"]);
+  edges.push(["n_shot", "shot_out",  "n_move",   "shot_in"]);
+
+  cut.keyframes.forEach((kf) => {
+    edges.push(["n_move",   `cam_${kf.frame}`, `n_kfcam_${kf.frame}`, "cam_in"]);
+    edges.push(["n_usd",    "scene_out",       `n_kfcam_${kf.frame}`, "scene_in"]);
+    edges.push([`n_kfcam_${kf.frame}`, "depth",  `n_kf_${kf.frame}`, "depth_in"]);
+    edges.push([`n_kfcam_${kf.frame}`, "canny",  `n_kf_${kf.frame}`, "canny_in"]);
+    edges.push([`n_kfcam_${kf.frame}`, "openps", `n_kf_${kf.frame}`, "pose_in"]);
+    edges.push(["n_prompt", "prompt_out", `n_kf_${kf.frame}`, "prompt_in"]);
+    edges.push([`n_kf_${kf.frame}`, "img", "n_comp", `kf_in_${kf.frame}`]);
+  });
+  // Pose feeds into prompt is implicit (body modifier already encoded);
+  // we draw a light timewire from pose to each keyframe render.
+  cut.keyframes.forEach((kf) => {
+    edges.push(["n_pose", "pose_out", `n_kf_${kf.frame}`, "pose_in", { dim:true }]);
+  });
+  // Inbetween wires
+  cut.inbetweens.forEach((ib) => {
+    edges.push([`n_kf_${ib.between[0]}`, "img", `n_ib_${ib.frame}`, "prev_in"]);
+    edges.push([`n_kf_${ib.between[1]}`, "img", `n_ib_${ib.frame}`, "next_in"]);
+    edges.push([`n_ib_${ib.frame}`, "img", "n_comp", `ib_in_${ib.frame}`]);
+  });
+  edges.push(["n_comp", "out",       "n_qa",    "cut_in"]);
+  edges.push(["n_vlm",  "vlm_out",   "n_qa",    "model_in"]);
+  edges.push(["n_comp", "out",       "n_final", "comp_in"]);
+  edges.push(["n_qa",   "score_out", "n_final", "score_in"]);
+
+  // ── CONTROL EDGES (LangGraph node → produced data node) ─────────
+  ctrlEdges.push(["c_enrich_usd",  ["n_usd","n_shot","n_pose","n_emot","n_prompt"]]);
+  ctrlEdges.push(["c_kf_camera",   ["n_move", ...cut.keyframes.map(kf => `n_kfcam_${kf.frame}`)]]);
+  ctrlEdges.push(["c_kf_render",   cut.keyframes.map(kf => `n_kf_${kf.frame}`)]);
+  ctrlEdges.push(["c_interp",      cut.inbetweens.map(ib => `n_ib_${ib.frame}`)]);
+  ctrlEdges.push(["c_composite",   ["n_comp"]]);
+  ctrlEdges.push(["c_vision_qa",   ["n_qa"]]);
+  ctrlEdges.push(["c_save",        ["n_final"]]);
+
+  return { nodes, edges, ctrlEdges, score: cut.score };
+}
+
+function scoreBadgeClass(t) {
+  if (t >= 78) return "ok";
+  if (t >= 65) return "ok";
+  if (t >= 50) return "warn";
+  if (t >= 35) return "bad";
+  return "crit";
+}
+function tierColorTotal(t) {
+  if (t >= 78) return "var(--t-usd)";
+  if (t >= 65) return "#80c050";
+  if (t >= 50) return "#f0a040";
+  if (t >= 35) return "#e07030";
+  return "var(--t-score)";
+}
+function scoreColor(v) { return v >= 7 ? "var(--t-usd)" : v >= 4 ? "#d8a830" : "var(--t-score)"; }
+
+//──────────────────────────────────────────────────────────────────────
+// Renderers
+//──────────────────────────────────────────────────────────────────────
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c =>
+    ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+window.openLB = function (kind, src, cap) {
+  const lb = document.querySelector(".lb");
+  const img = document.getElementById("lbimg");
+  const vid = document.getElementById("lbvid");
+  if (kind === "video") {
+    img.style.display = "none";
+    vid.style.display = "block"; vid.src = src;
+  } else {
+    vid.style.display = "none"; vid.pause();
+    img.style.display = "block"; img.src = src;
+  }
+  document.getElementById("lbcap").textContent = cap || "";
+  lb.classList.add("open");
+};
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") document.querySelector(".lb").classList.remove("open");
+});
+
+function renderRuler(n) {
+  // 0..durationFrames evenly spaced; majors at 1s = fps boundaries.
+  const dur = n.durationFrames, fps = n.fps, pxF = n.pxPerFrame, pad = n.leftPad;
+  let ticks = "", labels = "", kfs = "", ibs = "";
+  for (let f = 0; f <= dur; f++) {
+    const x = pad + f * pxF;
+    const isSec = (f % fps) === 0;
+    ticks += `<i class="tick ${isSec ? "major" : ""}" style="left:${x}px;"></i>`;
+    if (isSec || f === 1 || f === dur) {
+      labels += `<span class="tlbl" style="left:${x}px;">f=${f}${isSec ? ` (${(f/fps).toFixed(2)}s)` : ""}</span>`;
+    }
+  }
+  for (const kf of (n.keyframes || [])) {
+    const x = pad + kf.frame * pxF;
+    kfs += `<span class="kfmark" title="keyframe f=${kf.frame}" style="left:${x}px;"></span>`;
+  }
+  for (const ib of (n.inbetweens || [])) {
+    const x = pad + ib.frame * pxF;
+    ibs += `<span class="imark" title="inbetween f=${ib.frame}" style="left:${x}px;"></span>`;
+  }
+  return `<div id="${n.id}" class="ruler" style="left:${n.x}px;top:${n.y}px;width:${n.w}px;height:${n.h}px;">
+    <span class="tlbl" style="left:4px;transform:none;">time-axis · ${dur} frames @ ${fps} fps</span>
+    ${ticks}${labels}${kfs}${ibs}
+  </div>`;
+}
+
+function renderNode(n, activeId) {
+  if (n.kind === "ruler") return renderRuler(n);
+  const cls = ["node", n.kind || "data"];
+  if (n.id === activeId) cls.push("active");
+  const badgeCls = n.badge && /^(send|cond|ok|warn|bad|crit|time)$/.test(n.badge)
+    ? n.badge : "";
+  const inputs = (n.inputs || []).map((s, i, arr) => {
+    const y = 32 + (i + 1) * (n.h - 32) / (arr.length + 1);
+    return `<span class="sock sock-l" style="top:${y}px;background:${s.color};border-color:var(--bg-node);"></span>
+            <span class="sock-lbl" style="left:14px;top:${y - 14}px;">${escapeHtml(s.name)}</span>`;
+  }).join("");
+  const outputs = (n.outputs || []).map((s, i, arr) => {
+    const y = 32 + (i + 1) * (n.h - 32) / (arr.length + 1);
+    return `<span class="sock sock-r" style="top:${y}px;background:${s.color};border-color:var(--bg-node);"></span>
+            <span class="sock-lbl" style="right:14px;top:${y - 14}px;text-align:right;transform:translateX(0);">${escapeHtml(s.name)}</span>`;
+  }).join("");
+  let body = "";
+  if (n.file) {
+    const isVideo = /\.mp4$/i.test(n.file);
+    const imgH = n.h - 32 - (n.sub ? 36 : 0);
+    body += `<div class="node-img" style="height:${imgH}px;"
+                  onclick="openLB('${isVideo ? "video" : "image"}','img/${escapeHtml(n.file)}','${escapeHtml(n.file)}')">
+      ${isVideo
+        ? `<video src="img/${escapeHtml(n.file)}" muted preload="metadata"></video>`
+        : `<img src="img/${escapeHtml(n.file)}" loading="lazy">`}
+    </div>`;
+  } else if (n.placeholder) {
+    const imgH = n.h - 32 - (n.sub ? 36 : 0);
+    const pcls = n.placeholderClass ? `placeholder ${n.placeholderClass}` : "placeholder";
+    body += `<div class="node-img ${pcls}" style="height:${imgH}px;">${escapeHtml(n.placeholder)}</div>`;
+  }
+  if (n.score) {
+    const s = n.score;
+    body += `<div class="node-b" style="padding:6px 10px;">
+      <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:4px;">
+        <span style="font-size:20px;font-weight:700;color:${tierColorTotal(s.total)};font-variant-numeric:tabular-nums;">${s.total.toFixed(1)}</span>
+        <span style="font-size:10px;color:var(--txt-dim);">/100</span>
+        <span style="font-size:10px;color:var(--txt-mid);">${escapeHtml(s.label || "")}</span>
+      </div>
+      <div style="display:flex;gap:5px;margin-bottom:5px;flex-wrap:wrap;">
+        <span style="font-size:9px;padding:1px 6px;background:#3a4960;color:#a8c8ff;
+                      border-radius:3px;font-family:ui-monospace,monospace;">
+          ${escapeHtml(s.version_tag || "v3")}
+        </span>
+      </div>
+      <div class="axes">${renderAxes(s.scores)}</div>
+    </div>`;
+  }
+  if (n.sub) {
+    body += `<div class="node-b" style="white-space:pre-line;">${escapeHtml(n.sub)}</div>`;
+  }
+  return `<div class="${cls.join(" ")}" id="${n.id}" data-id="${n.id}"
+               style="left:${n.x}px;top:${n.y}px;width:${n.w}px;height:${n.h}px;">
+    <div class="node-h">${escapeHtml(n.title)}${n.badge
+      ? `<span class="badge ${badgeCls}">${escapeHtml(n.badge)}</span>`
+      : ""}</div>
+    ${body}
+    ${inputs}${outputs}
+  </div>`;
+}
+function renderAxes(scores) {
+  if (!scores) return "";
+  const keys = ["character_visible","scene_continuity","camera_smoothness",
+    "pose_consistency","emotion_match","controlnet_fidelity",
+    "keyframe_density","inbetween_quality","motion_arc",
+    "lighting_continuity","lipsync_slot","audio_slot_ready"];
+  return keys.filter(k => k in scores).map(k => {
+    const v = +scores[k] || 0;
+    const c = v >= 7 ? "#50b450" : v >= 4 ? "#d8a830" : "#c84040";
+    return `<div class="ax">
+      <span class="n" title="${escapeHtml(k)}: ${v}">${escapeHtml(k.replace(/_/g, " "))}</span>
+      <span class="v" style="color:${c}">${v}</span>
+    </div>
+    <div class="bar"><i style="width:${Math.min(100, v * 10)}%;background:${c};"></i></div>`;
+  }).join("");
+}
+
+//──────────────────────────────────────────────────────────────────────
+// Edge rendering — bezier
+//──────────────────────────────────────────────────────────────────────
+function nodeSocketPos(node, sockId, side) {
+  if (node.kind === "ruler") return { x: node.x + node.w / 2, y: node.y + node.h / 2 };
+  const list = side === "in" ? (node.inputs || []) : (node.outputs || []);
+  const i = list.findIndex(s => s.id === sockId);
+  if (i < 0) return { x: side === "in" ? node.x : node.x + node.w, y: node.y + node.h / 2 };
+  const y = node.y + 32 + (i + 1) * (node.h - 32) / (list.length + 1);
+  const x = side === "in" ? node.x : node.x + node.w;
+  return { x, y };
+}
+function bezierPath(p1, p2, opts = {}) {
+  const dx = Math.max(40, Math.abs(p2.x - p1.x) * 0.5);
+  if (opts.loop) {
+    const top = Math.min(p1.y, p2.y) - 80;
+    return `M ${p1.x} ${p1.y} C ${p1.x + 120} ${top}, ${p2.x - 120} ${top}, ${p2.x} ${p2.y}`;
+  }
+  return `M ${p1.x} ${p1.y} C ${p1.x + dx} ${p1.y}, ${p2.x - dx} ${p2.y}, ${p2.x} ${p2.y}`;
+}
+
+function renderEdges(nodes, dataEdges, ctrlEdges, ctrlNodeEdges) {
+  const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const paths = [];
+  // control flow (between LangGraph nodes)
+  for (const e of ctrlNodeEdges) {
+    const [a, b, opts] = e;
+    const na = byId[a], nb = byId[b];
+    if (!na || !nb) continue;
+    const p1 = { x: na.x + na.w, y: na.y + na.h / 2 };
+    const p2 = { x: nb.x, y: nb.y + nb.h / 2 };
+    const loop = opts?.curve === "loop";
+    const d = bezierPath(p1, p2, { loop });
+    const lbl = opts?.label
+      ? `<text class="edge-lbl" x="${(p1.x + p2.x) / 2}" y="${loop ? Math.min(p1.y, p2.y) - 65 : (p1.y + p2.y) / 2 - 6}" text-anchor="middle">${escapeHtml(opts.label)}</text>`
+      : "";
+    const klass = opts?.cond ? "edge ctrl cond" : "edge ctrl";
+    paths.push(`<path class="${klass}" d="${d}" />${lbl}`);
+  }
+  // tensor data edges
+  for (const e of dataEdges) {
+    const [aId, aSock, bId, bSock, opts] = e;
+    const na = byId[aId], nb = byId[bId];
+    if (!na || !nb) continue;
+    const p1 = nodeSocketPos(na, aSock, "out");
+    const p2 = nodeSocketPos(nb, bSock, "in");
+    const outSock = (na.outputs || []).find(s => s.id === aSock);
+    const color = outSock?.color || "var(--txt-dim)";
+    const d = bezierPath(p1, p2);
+    const klass = opts?.dim ? "edge timewire" : "edge";
+    paths.push(`<path class="${klass}" d="${d}" stroke="${color}" />`);
+  }
+  // control → data dashed
+  for (const [ctrlId, dataIds] of ctrlEdges) {
+    const nc = byId[ctrlId];
+    if (!nc) continue;
+    for (const dId of dataIds) {
+      const nd = byId[dId];
+      if (!nd) continue;
+      const p1 = { x: nc.x + nc.w / 2, y: nc.y + nc.h };
+      const p2 = { x: nd.x + nd.w / 2, y: nd.y };
+      const dy = Math.abs(p2.y - p1.y) * 0.4;
+      const d = `M ${p1.x} ${p1.y} C ${p1.x} ${p1.y + dy}, ${p2.x} ${p2.y - dy}, ${p2.x} ${p2.y}`;
+      paths.push(`<path class="edge ctrl" d="${d}" />`);
+    }
+  }
+  return paths.join("\n");
+}
+
+//──────────────────────────────────────────────────────────────────────
+// Pan / zoom (same as v6)
+//──────────────────────────────────────────────────────────────────────
+const state = { scale: 0.6, tx: 40, ty: 40 };
+function applyTransform() {
+  document.getElementById("world").style.transform =
+    `translate(${state.tx}px, ${state.ty}px) scale(${state.scale})`;
+}
+function fitToScreen(bbox) {
+  const vp = document.getElementById("viewport");
+  const w = vp.clientWidth, h = vp.clientHeight;
+  const margin = 40;
+  const sx = (w - 2 * margin) / bbox.w;
+  const sy = (h - 2 * margin) / bbox.h;
+  state.scale = Math.min(sx, sy, 1);
+  state.tx = margin - bbox.x * state.scale;
+  state.ty = margin - bbox.y * state.scale;
+  applyTransform();
+}
+(function attachPanZoom() {
+  const vp = document.getElementById("viewport");
+  let dragging = false, ox = 0, oy = 0;
+  vp.addEventListener("mousedown", e => {
+    if (e.target.closest(".node-img, .sock, button, select, a")) return;
+    dragging = true; vp.classList.add("dragging");
+    ox = e.clientX - state.tx; oy = e.clientY - state.ty;
+    e.preventDefault();
+  });
+  window.addEventListener("mousemove", e => {
+    if (!dragging) return;
+    state.tx = e.clientX - ox; state.ty = e.clientY - oy;
+    applyTransform();
+  });
+  window.addEventListener("mouseup", () => { dragging = false; vp.classList.remove("dragging"); });
+  vp.addEventListener("wheel", e => {
+    e.preventDefault();
+    const rect = vp.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const wx = (mx - state.tx) / state.scale;
+    const wy = (my - state.ty) / state.scale;
+    const f = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+    state.scale = Math.max(0.15, Math.min(3, state.scale * f));
+    state.tx = mx - wx * state.scale;
+    state.ty = my - wy * state.scale;
+    applyTransform();
+  }, { passive: false });
+})();
+
+//──────────────────────────────────────────────────────────────────────
+// Main render
+//──────────────────────────────────────────────────────────────────────
+function renderSidebar(active) {
+  const html = CUTS.map((c, i) => {
+    const s = c.score;
+    const scoreS = s ? `<span style="color:${tierColorTotal(s.total)};font-family:ui-monospace,monospace;font-size:10px;margin-right:6px;">${s.total.toFixed(0)}</span>` : `<span style="color:var(--txt-dim);font-family:ui-monospace,monospace;font-size:10px;margin-right:6px;">·</span>`;
+    return `<a class="sb-item ${i === active ? "active" : ""}" href="#cut${String(i+1).padStart(2,"0")}" data-idx="${i}">
+      ${scoreS}${escapeHtml(c.name)} · ${escapeHtml(c.scene.replace("anime-",""))} · ${escapeHtml(c.shot)} · ${escapeHtml(c.move)}
+    </a>`;
+  }).join("");
+  document.getElementById("sb-list").innerHTML = html;
+}
+function renderAll(cutIdx) {
+  const cut = CUTS[cutIdx];
+  const { nodes, edges, ctrlEdges } = buildCutGraph(cutIdx);
+  const allNodes = [...CONTROL_NODES, ...nodes];
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const n of allNodes) {
+    minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
+    maxX = Math.max(maxX, n.x + n.w); maxY = Math.max(maxY, n.y + n.h);
+  }
+  const bbox = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+  const svg = document.getElementById("edges");
+  svg.setAttribute("width", maxX + 200);
+  svg.setAttribute("height", maxY + 200);
+  svg.innerHTML = renderEdges(allNodes, edges, ctrlEdges, CONTROL_EDGES);
+  document.getElementById("nodes").innerHTML =
+    allNodes.map(n => renderNode(n, null)).join("");
+  let scoreInfo = "";
+  if (cut.score) {
+    scoreInfo = ` · ${cut.score.total.toFixed(1)}/100 ${cut.score.label || ""} [${cut.score.version_tag}]`;
+  }
+  document.getElementById("sub").textContent =
+    `cut ${cut.name} · ${cut.scene} · ${cut.shot}/${cut.angle}/${cut.rule} · ${cut.move} dist=${cut.moveDist} · dur=${cut.durationFrames}f@${cut.fps}fps · K=${cut.keyframes.length} I=${cut.inbetweens.length}${scoreInfo}`;
+  renderSidebar(cutIdx);
+  fitToScreen(bbox);
+}
+
+function getCutFromHash() {
+  const m = location.hash.match(/^#cut(\d+)/);
+  if (!m) return null;
+  const n = parseInt(m[1], 10);
+  return (n >= 1 && n <= CUTS.length) ? n - 1 : null;
+}
+
+// 5-second scene preview overlay
+window.openScene5s = function () {
+  openLB("video", "img/animeka-scene-5s.mp4",
+    "5s preview · cut01→cut02→cut03→cut04 · synth BGM + handcrafted SFX + edge-tts");
+};
+// 42-second 6-cut episode scene with MMAudio video-synced SFX
+window.openScene42s = function () {
+  openLB("video", "img/animeka-scene-42s.mp4",
+    "42s episode · cut05→01→03→02→06→04 · MMAudio SFX (video-conditioned) + numpy BGM + edge-tts JP dialogue × 9");
+};
+// IPFS CID panel — fetched from ipfs-cid-manifest.json
+let _ipfsManifest = null;
+window.openIpfsPanel = async function () {
+  if (!_ipfsManifest) {
+    try {
+      _ipfsManifest = await (await fetch("/img/ipfs-cid-manifest.json")).json();
+    } catch (e) {
+      alert("Failed to load ipfs-cid-manifest.json: " + e);
+      return;
+    }
+  }
+  const files = _ipfsManifest.files || {};
+  const bundle = _ipfsManifest.bundle_cid;
+  // Render as a styled overlay (re-use the lightbox div for backdrop)
+  const lb = document.querySelector(".lb");
+  const cap = document.getElementById("lbcap");
+  document.getElementById("lbimg").style.display = "none";
+  document.getElementById("lbvid").style.display = "none";
+  // Insert custom overlay
+  let panel = document.getElementById("ipfs-panel");
+  if (!panel) {
+    panel = document.createElement("div");
+    panel.id = "ipfs-panel";
+    panel.style.cssText = "background:rgba(20,22,27,0.97);border:1px solid #50c0d0;border-radius:8px;padding:18px;max-width:90vw;max-height:85vh;overflow:auto;font:11px ui-monospace,monospace;color:#e8e8ea;";
+    panel.onclick = (e) => e.stopPropagation();
+    lb.appendChild(panel);
+  }
+  const videos = Object.entries(files).filter(([_,v]) => v.kind === "video").sort();
+  const images = Object.entries(files).filter(([_,v]) => v.kind === "image").sort();
+  const fmt = (b) => b > 1e6 ? `${(b/1e6).toFixed(1)}MB` : `${(b/1024).toFixed(0)}KB`;
+  const row = (name, info) => `
+    <tr>
+      <td style="padding:4px 8px;color:#a8c8ff;white-space:nowrap;">${escapeHtml(name)}</td>
+      <td style="padding:4px 8px;color:var(--txt-dim);font-size:10px;">${fmt(info.size)}</td>
+      <td style="padding:4px 8px;font-size:10px;"><a href="https://ipfs.io/ipfs/${info.cid}" target="_blank" style="color:#50c0d0;text-decoration:none;" title="Open via ipfs.io public gateway">${info.cid.slice(0,20)}…${info.cid.slice(-8)}</a></td>
+      <td style="padding:4px 8px;"><button onclick="navigator.clipboard.writeText('${info.cid}');this.textContent='✓'" style="background:#1f2733;color:#a8e0e8;border:1px solid #3a4a5a;border-radius:3px;padding:2px 8px;font:10px ui-monospace,monospace;cursor:pointer;">copy CID</button></td>
+      <td style="padding:4px 8px;"><a href="ipfs://${info.cid}" style="color:#80c0ff;text-decoration:none;font-size:10px;" title="Open via ipfs:// protocol handler">ipfs://</a></td>
+    </tr>`;
+  panel.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:8px;">
+      <h2 style="margin:0;color:#fff;font-size:14px;">⌬ IPFS CIDs — animeka v9 outputs</h2>
+      <span style="color:var(--txt-dim);">${videos.length} videos · ${images.length} keyframes · pinned local</span>
+      <button onclick="document.querySelector('.lb').classList.remove('open')" style="margin-left:auto;background:#2a2a33;color:#e8e8ea;border:0;border-radius:3px;padding:4px 10px;cursor:pointer;">close</button>
+    </div>
+    <div style="margin-bottom:10px;padding:8px;background:#1a2330;border-radius:4px;">
+      <strong style="color:#a8e0e8;">Bundle (whole dir, single CID)</strong><br>
+      <a href="https://ipfs.io/ipfs/${bundle}" target="_blank" style="color:#50c0d0;font-size:11px;">https://ipfs.io/ipfs/${bundle}</a>
+      <button onclick="navigator.clipboard.writeText('${bundle}');this.textContent='✓'" style="margin-left:8px;background:#1f2733;color:#a8e0e8;border:1px solid #3a4a5a;border-radius:3px;padding:2px 8px;font:10px ui-monospace,monospace;cursor:pointer;">copy</button>
+    </div>
+    <h3 style="font-size:12px;color:#fff;margin:14px 0 6px;">Videos (${videos.length})</h3>
+    <table style="border-collapse:collapse;width:100%;">${videos.map(([n,i]) => row(n,i)).join("")}</table>
+    <h3 style="font-size:12px;color:#fff;margin:14px 0 6px;">Keyframes (${images.length})</h3>
+    <table style="border-collapse:collapse;width:100%;">${images.map(([n,i]) => row(n,i)).join("")}</table>
+    <div style="margin-top:14px;font-size:10px;color:var(--txt-dim);line-height:1.6;">
+      <strong>Pin status</strong>: 27 files pinned to local kubo node (PeerID 12D3KooWBhvfp6Z…).
+      Reachable via DHT from <a href="https://ipfs.io" target="_blank" style="color:#50c0d0;">ipfs.io</a> /
+      <a href="https://dweb.link" target="_blank" style="color:#50c0d0;">dweb.link</a> /
+      any public IPFS gateway. For permanent etzhayyim-managed pin (Filecoin-backed), see
+      <code style="color:#a8e0e8;">com.etzhayyim.apps.ipfsIngest.pin</code> XRPC (requires etzhayyim auth).<br>
+      <strong>datalad dataset</strong>: <code style="color:#a8e0e8;">/private/tmp/animeka-dataset</code>
+      (11 files, 16.1MB git-annex tracked + CIDs as metadata)
+    </div>`;
+  cap.textContent = "";
+  cap.style.display = "none";
+  lb.classList.add("open");
+};
+document.addEventListener("click", (e) => {
+  if (e.target.closest("#scene-btn"))   { e.preventDefault(); openScene5s();  return; }
+  if (e.target.closest("#scene42-btn")) { e.preventDefault(); openScene42s(); return; }
+  if (e.target.closest("#ipfs-btn"))    { e.preventDefault(); openIpfsPanel(); return; }
+});
+// Make sure lightbox close also removes the ipfs panel cleanly
+document.querySelector(".lb")?.addEventListener("click", (e) => {
+  if (e.target === e.currentTarget) {
+    const p = document.getElementById("ipfs-panel"); if (p) p.remove();
+    document.getElementById("lbcap").style.display = "";
+  }
+});
+
+(function init() {
+  const sel = document.getElementById("cut-sel");
+  const initial = getCutFromHash();
+  if (initial !== null) sel.value = String(initial);
+  function navigate(idx) {
+    sel.value = String(idx);
+    const tag = `#cut${String(idx+1).padStart(2,"0")}`;
+    if (location.hash !== tag) history.replaceState(null, "", tag);
+    document.title = `animeka v9 — ${CUTS[idx].name} (${CUTS[idx].scene})`;
+    renderAll(idx);
+  }
+  sel.addEventListener("change", () => navigate(+sel.value));
+  document.getElementById("fit").addEventListener("click", () => renderAll(+sel.value));
+  document.getElementById("reset").addEventListener("click", () => {
+    state.scale = 1; state.tx = 0; state.ty = 0; applyTransform();
+  });
+  document.addEventListener("click", e => {
+    const a = e.target.closest(".sb-item");
+    if (!a) return;
+    e.preventDefault();
+    navigate(+a.dataset.idx);
+  });
+  window.addEventListener("hashchange", () => {
+    const c = getCutFromHash();
+    if (c !== null && +sel.value !== c) navigate(c);
+  });
+  navigate(+sel.value);
+})();
+</script>
+</body>
+</html>

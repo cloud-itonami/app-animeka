@@ -1,1 +1,7 @@
-{:schema "etzhayyim.repository/readme-v1" :name "com-etzhayyim-app-animeka" :kind :application :source "etzhayyim/root/60-apps/etzhayyim-project-animeka"}
+{:schema "etzhayyim.repository/readme-v1"
+ :name "app-animeka"
+ :kind :application
+ :source "etzhayyim/root/60-apps/etzhayyim-project-animeka"
+ :boundary {:role :team-creation-application
+            :business-layer "cloud-itonami/animeka"
+            :production-actor "cloud-itonami/animeka-actor"}}

@@ -67,8 +67,12 @@ lg/
   thread_ids are namespaced (`xrpc:{nsid_tail}:...`).
 - Audit shim emits `animeka.*` activities to bpmn-dispatcher (fire-and-
   forget). OCEL trail preserved per ADR-0056.
-- `VLLM_URL` defaults to RunPod unified pod `vyp99t9px7h4dl-4000`. Per
-  ADR-2605010000 there is no Murakumo fallback.
+- `VLLM_URL` defaults to the murakumo fleet (`https://api.murakumo.cloud/v1`)
+  and `VLLM_MODEL` to the `murakumo-main` alias, which the fleet resolves
+  server-side (ADR-2607173100). Neither default names a concrete model, so a
+  fleet-side model switch needs no change here. This replaced a default of
+  RunPod unified pod `vyp99t9px7h4dl-4000`: RunPod releases those hostnames
+  and can reassign them to another tenant.
 - `ANIMEKA_APP_DID` env defaults to `did:web:animeka.etzhayyim.com`.
 
 ## NSID coverage map (27 of 27)

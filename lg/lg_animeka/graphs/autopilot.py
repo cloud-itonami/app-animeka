@@ -34,8 +34,26 @@ from lg_animeka.audit import emit_audit_bg
 _log = logging.getLogger(__name__)
 
 _RW_URL = os.environ.get("RW_URL") or os.environ.get("LG_CHECKPOINTER_URL", "")
-_VLLM_URL = os.environ.get("VLLM_URL", "https://vyp99t9px7h4dl-4000.proxy.runpod.net/v1").rstrip("/")
-_VLLM_MODEL = os.environ.get("VLLM_MODEL", "tier0-general")
+# Inference edge — murakumo fleet (ADR-2607173100).
+#
+# Resolution order, per the ADR:
+#   1. env override — VLLM_URL / VLLM_MODEL still win, unchanged.
+#   2. alias resolution — handled *server-side*. `api.murakumo.cloud` resolves
+#      the `murakumo-main` KV alias entry itself, so we send the alias name as
+#      the model and never learn (or pin) the concrete id behind it. No startup
+#      GET of /infer/models/murakumo-main is needed: it would add a failure
+#      mode without changing the answer.
+#   3. fallback bakes the ENDPOINT ONLY. No concrete model id appears below,
+#      so a fleet-side model switch is picked up on the next call from this
+#      cron fire, with no release here.
+#
+# The previous default was `https://vyp99t9px7h4dl-4000.proxy.runpod.net/v1`,
+# an ephemeral RunPod pod id. RunPod releases those hostnames and can reassign
+# them to another tenant, so the default named a host someone else may come to
+# own. `_chat` below sends only Content-Type — no credential reaches this
+# endpoint — so what was exposed is scene text and prompts, not secrets.
+_VLLM_URL = os.environ.get("VLLM_URL", "https://api.murakumo.cloud/v1").rstrip("/")
+_VLLM_MODEL = os.environ.get("VLLM_MODEL", "murakumo-main")
 _VLLM_TIMEOUT = float(os.environ.get("VLLM_TIMEOUT_SEC", "60"))
 _PDS_BASE = os.environ.get("PDS_URL", "https://atproto.etzhayyim.com")
 _APP_DID = os.environ.get("ANIMEKA_APP_DID", "did:web:animeka.etzhayyim.com")

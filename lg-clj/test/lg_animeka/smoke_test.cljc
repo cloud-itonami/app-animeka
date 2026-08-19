@@ -7,6 +7,9 @@
   Murakumo endpoint guard, the autopilot conditional route, and the ComfyUI
   quality-workflow shape — all under bb with the DB/LLM/render seams stubbed."
   (:require [clojure.test :refer [deftest is testing]]
+            [clojure.set :as set]
+            [clojure.string :as str]
+            #?(:clj [cheshire.core :as json])
             [langgraph.graph :as g]
             [lg-animeka.server :as server]
             [lg-animeka.util :as u]
@@ -364,3 +367,114 @@
       (is (= "blob-cid" (:kf_cid out)))
       (is (= "posted" (:post_status out)))
       (is (true? (:ok out))))))
+
+;; ── cross-tree claims that README.md / docs/operator-quickstart.md make ─────
+;;
+;; This repo carries four trees (lg/ Python, lg-clj/ this port, kotoba/ TS,
+;; appview/ Cloudflare) and only one of them runs here. README.md says so with
+;; numbers. Prose rots silently, so each load-bearing number gets an assertion
+;; next to the tree it describes — the same discipline the langgraph
+;; operator-quickstart uses (superproject scripts/maturity-loop/mutations.edn).
+;;
+;; These are deliberately two-way: they go red if the situation DEGRADES (a
+;; graph is declared that nothing implements) and equally red if it IMPROVES
+;; (the missing Python modules get landed, the appview aliases get fixed). Red
+;; on improvement is not a false alarm — it means README.md is now wrong and
+;; must be corrected. A doc claim nobody can break is a doc claim nobody
+;; maintains.
+;;
+;; :clj only: they read the repo from disk. The rest of this suite is pure.
+
+#?(:clj
+   (def repo-root
+     "The repo root, found by walking up from the process cwd. The suite is
+     started both from lg-clj/ (`bb test`) and from the repo root
+     (`bb lg-clj/run_tests.clj`), so neither cwd can be assumed."
+     (loop [d (.getCanonicalFile (java.io.File. (System/getProperty "user.dir")))]
+       (cond
+         (nil? d) nil
+         (and (.isFile (java.io.File. d "migration.edn"))
+              (.isDirectory (java.io.File. d "lg-clj"))) d
+         :else (recur (.getParentFile d))))))
+
+#?(:clj
+   (defn- declared-graphs
+     "{graph-name module-path} as `lg/langgraph.json` declares them."
+     []
+     (-> (slurp (java.io.File. repo-root "lg/langgraph.json"))
+         (json/parse-string)
+         (get "graphs"))))
+
+#?(:clj
+   (defn- python-graph-modules []
+     (->> (.listFiles (java.io.File. repo-root "lg/lg_animeka/graphs"))
+          (map #(.getName %))
+          (filter #(str/ends-with? % ".py"))
+          (remove #{"__init__.py"})
+          (map #(subs % 0 (- (count %) 3)))
+          set)))
+
+#?(:clj
+   (deftest repo-root-is-findable
+     ;; The three tests below silently pass on an empty file set if this is nil,
+     ;; which is exactly the "a check that could not run looks like a check that
+     ;; found nothing" failure. Assert it separately so that mode is loud.
+     (is (some? repo-root) "walked up from cwd without finding migration.edn + lg-clj/")))
+
+#?(:clj
+   (deftest python-tree-is-a-stub-not-a-runtime-in-this-repo
+     ;; README.md §"What actually runs" says: langgraph.json declares 27 graphs,
+     ;; 4 of them exist here, and lg_animeka/server.py — the uvicorn target in
+     ;; lg/Dockerfile — is not in this repo at all. Land the missing modules and
+     ;; this goes red so the README stops saying "stub".
+     (let [declared (set (keys (declared-graphs)))
+           present (python-graph-modules)]
+       (is (= 27 (count declared)) "lg/langgraph.json no longer declares 27 graphs")
+       (is (= 23 (count (remove present declared)))
+           (str "declared-but-absent Python modules changed: "
+                (sort (remove present declared))))
+       (is (= #{"assemble_episode" "autopilot" "generate_audio" "publish_episode"}
+              (set/intersection declared present))
+           "the set of declared graphs that actually have a module changed")
+       (is (not (.exists (java.io.File. repo-root "lg/lg_animeka/server.py")))
+           "lg/lg_animeka/server.py appeared — the Dockerfile's uvicorn target is no longer missing"))))
+
+#?(:clj
+   (deftest cljc-tree-implements-exactly-the-declared-graph-set
+     ;; README.md §"What actually runs" says lg-clj is the complete tree: the
+     ;; .cljc files, the dispatch registry, and langgraph.json name the same 27
+     ;; graphs. Three sources, one set — drift in any of them is a bug in that
+     ;; one, and this says which.
+     (let [declared (declared-graphs)
+           declared-names (set (keys declared))
+           files (->> (.listFiles (java.io.File. repo-root "lg-clj/src/lg_animeka/graphs"))
+                      (map #(.getName %))
+                      (filter #(str/ends-with? % ".cljc"))
+                      (map #(subs % 0 (- (count %) 5)))
+                      set)]
+       (is (= declared-names files)
+           "langgraph.json and lg-clj/src/lg_animeka/graphs/ name different graphs")
+       (is (= declared-names (set (keys server/GRAPHS)))
+           "langgraph.json and the clj dispatch registry name different graphs")
+       ;; ...and each declaration points at the module named after its own key.
+       (doseq [[nm modpath] declared]
+         (is (= (str "./lg_animeka/graphs/" nm ".py:GRAPH") modpath)
+             (str "langgraph.json entry " nm " points at " modpath))))))
+
+#?(:clj
+   (deftest appview-cannot-be-built-from-this-repo
+     ;; README.md §"What actually runs" says the appview is not buildable here:
+     ;; every alias in its wrangler config is an absolute path, so none of them
+     ;; resolves against this repo whatever machine it is cloned onto. Asserted
+     ;; as "absolute", not as "missing on my laptop" — the defect belongs to the
+     ;; file, not to one checkout.
+     (let [f (java.io.File. repo-root "appview/etzhayyim-wasm-animeka-an1m3k4x/wrangler.jsonc")
+           cfg (-> (slurp f)
+                   (str/replace #"(?m)^\s*//.*$" "")
+                   (json/parse-string))
+           aliases (get cfg "alias")]
+       (is (seq aliases) "wrangler.jsonc has no alias map any more")
+       (is (= 8 (count aliases)) "the alias count changed")
+       (is (every? #(str/starts-with? % "/") (vals aliases))
+           (str "an alias is no longer an absolute path — the appview may now be buildable: "
+                (remove #(str/starts-with? % "/") (vals aliases)))))))

@@ -14,7 +14,7 @@
   builder (`render/quality-workflow`) is the pure, tested piece; LLM/render/
   composite/audio/PDS are injectable seams."
   (:require #?(:clj [cheshire.core :as json])
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [langgraph.graph :as g]
             [lg-animeka.audit :as audit]
             [lg-animeka.graphs.generate-audio :as audio]

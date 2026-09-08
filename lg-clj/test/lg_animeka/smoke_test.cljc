@@ -8,7 +8,7 @@
   quality-workflow shape — all under bb with the DB/LLM/render seams stubbed."
   (:require [clojure.test :refer [deftest is testing]]
             [clojure.set :as set]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             #?(:clj [cheshire.core :as json])
             [langgraph.graph :as g]
             [lg-animeka.server :as server]

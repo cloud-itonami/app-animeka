@@ -15,7 +15,7 @@
 
   The single piece of pure, host-independent content — the autopilot ComfyUI
   workflow JSON builder — is ported faithfully here and unit-tested."
-  (:require [clojure.string :as str]))
+  (:require [kotoba.lang.text :as str]))
 
 (def ckpt "animagine-xl-4.0.safetensors")
 

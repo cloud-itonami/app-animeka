@@ -5,7 +5,7 @@
   modules (`_rkey_from_id`, `_gen_rkey`, `_cid_stub`, clip, clamp, camel/snake
   conversion). They are host-independent pure functions, so they verify under
   bb with no external runtime."
-  (:require [clojure.string :as str]))
+  (:require [kotoba.lang.text :as str]))
 
 (def ^:dynamic app-did "did:web:animeka.etzhayyim.com")
 
@@ -65,9 +65,9 @@
     (->> (map-indexed
           (fn [i ch]
             (let [c (str ch)]
-              (if (and (pos? i) (= c (str/upper-case c)) (not= c (str/lower-case c)))
-                (str "_" (str/lower-case c))
-                (str/lower-case c))))
+              (if (and (pos? i) (= c (str/upper c)) (not= c (str/lower c)))
+                (str "_" (str/lower c))
+                (str/lower c))))
           s)
          (apply str))))
 

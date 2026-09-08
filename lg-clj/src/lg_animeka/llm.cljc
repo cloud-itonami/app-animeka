@@ -15,7 +15,7 @@
        :latency-ms <int>}
     | {:error <str> :latency-ms <int>}"
   (:require #?(:clj [cheshire.core :as json])
-            [clojure.string :as str]))
+            [kotoba.lang.text :as str]))
 
 ;; Murakumo fleet (ADR-2605215000) — the ONLY inference endpoints representable.
 (def murakumo-allowed-hosts
@@ -36,8 +36,8 @@
   (let [[_ scheme host] (or (re-find #"^([A-Za-z][A-Za-z0-9+.\-]*)://([^/?#]*)"
                                      (str endpoint))
                             [nil nil nil])]
-    (when-not (and (= "http" (some-> scheme str/lower-case))
-                   (contains? murakumo-allowed-hosts (some-> host str/lower-case)))
+    (when-not (and (= "http" (some-> scheme str/lower))
+                   (contains? murakumo-allowed-hosts (some-> host str/lower)))
       (throw (ex-info (str "inference endpoint " (pr-str endpoint)
                            " is outside the Murakumo fleet (ADR-2605215000)")
                       {:murakumo-only-violation true :endpoint endpoint})))))

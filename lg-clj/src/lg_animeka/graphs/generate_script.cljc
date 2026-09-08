@@ -2,7 +2,7 @@
   "animeka `generateScript` graph — LLM screenplay generation for an episode.
   NSID: com.etzhayyim.animeka.generateScript. Faithful clj port of `generate_script.py`.
   Topology: START → fetch_episode → llm_script → insert → audit → END."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [langgraph.graph :as g]
             [lg-animeka.audit :as audit]
             [lg-animeka.llm :as llm]

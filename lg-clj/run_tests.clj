@@ -3,7 +3,7 @@
   Reused in place because ADR-2607171100 freezes new files under numbered layers."
   (:require [babashka.http-client :as http]
             [cheshire.core :as json]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [clojure.test :as t]
             [org.httpkit.server :as httpkit]
             [lg-animeka.audit :as audit]

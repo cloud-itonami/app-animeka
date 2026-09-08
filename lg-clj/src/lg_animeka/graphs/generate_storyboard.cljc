@@ -3,7 +3,7 @@
   monochrome storyboard sketch. NSID: com.etzhayyim.animeka.generateStoryboard.
   Faithful clj port of `generate_storyboard.py`.
   Topology: START → fetch_cut → llm_prompt → render → insert → audit → END."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [langgraph.graph :as g]
             [lg-animeka.audit :as audit]
             [lg-animeka.llm :as llm]

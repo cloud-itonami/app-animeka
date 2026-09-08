@@ -4,7 +4,7 @@
   NSID: com.etzhayyim.animeka.generateBackground. Faithful clj port of
   `generate_background.py`.
   Topology: START → fetch_context → llm_bg → render → insert → audit → END."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [langgraph.graph :as g]
             [lg-animeka.audit :as audit]
             [lg-animeka.llm :as llm]

@@ -3,7 +3,7 @@
   colorTrace record. NSID: com.etzhayyim.animeka.autoTraceCut. Faithful clj port
   of `auto_trace_cut.py`.
   Topology: START → fetch_keyframe → llm_color_prompt → render_trace → insert → audit → END."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [langgraph.graph :as g]
             [lg-animeka.audit :as audit]
             [lg-animeka.llm :as llm]

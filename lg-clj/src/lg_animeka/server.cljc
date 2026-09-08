@@ -15,7 +15,7 @@
   twins use); the 27 StateGraphs + dispatch are the load-bearing port. The
   Python FastAPI server (`lg/`) remains the deployed runtime and COEXISTS."
   (:require #?(:clj [cheshire.core :as json])
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [langgraph.graph :as g]
             [lg-animeka.util :as u]
             [lg-animeka.graphs.health :as health]

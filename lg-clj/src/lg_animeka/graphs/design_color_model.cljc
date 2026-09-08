@@ -4,7 +4,7 @@
   port of `design_color_model.py`.
   Topology: START → llm_palette → render → insert → audit → END."
   (:require #?(:clj [cheshire.core :as json])
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [langgraph.graph :as g]
             [lg-animeka.audit :as audit]
             [lg-animeka.llm :as llm]

@@ -14,7 +14,7 @@
 ;; satisfied without the langgraph runtime, so it raises with the same
 ;; precondition (CHECKPOINTER_URL must be set) the Python code enforces.
 (ns lg.lg-animeka.checkpointer
-  (:require [clojure.string]))
+  (:require [kotoba.lang.text]))
 
 ;; ── env: LG_CHECKPOINTER_URL or RW_URL ───────────────────────────────
 (defn checkpointer-url
@@ -76,7 +76,7 @@
   set); the saver itself is unavailable on this host."
   [& [supplied-url]]
   (let [url (checkpointer-url supplied-url)]
-    (when (clojure.string/blank? url)
+    (when (kotoba.lang.text/blank? url)
       (throw (ex-info
                (str "LG_CHECKPOINTER_URL or RW_URL must be set "
                     "for the lg-animeka checkpointer")

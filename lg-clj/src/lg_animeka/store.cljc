@@ -18,7 +18,7 @@
   returns. A real deployment injects a kotoba-Datom-log-backed `*query*`/`*exec*`
   (or, transitionally, a psycopg shim) without touching any graph topology.
   Tests rebind `*query*`/`*exec*` to in-memory stubs."
-  (:require [clojure.string :as str]))
+  (:require [kotoba.lang.text :as str]))
 
 (def ^:dynamic *rw-url* "")
 

@@ -5,7 +5,7 @@
 
   DEVIATION: langgraph-clj has no RetryPolicy. The vLLM edge is the Murakumo
   loopback (`llm/chat`); actor personas + message assembly are ported verbatim."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [langgraph.graph :as g]
             [lg-animeka.audit :as audit]
             [lg-animeka.llm :as llm]

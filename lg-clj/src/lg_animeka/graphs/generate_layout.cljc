@@ -3,7 +3,7 @@
   NSID: com.etzhayyim.animeka.generateLayout. Faithful clj port of `generate_layout.py`.
   Topology: START → fetch_context → llm_plan → render → insert → audit → END."
   (:require #?(:clj [cheshire.core :as json])
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [langgraph.graph :as g]
             [lg-animeka.audit :as audit]
             [lg-animeka.llm :as llm]

@@ -7,7 +7,7 @@
   the clamp to max_cuts are ported faithfully and tested; inserts go through the
   injectable store seam."
   (:require #?(:clj [cheshire.core :as json])
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [langgraph.graph :as g]
             [lg-animeka.audit :as audit]
             [lg-animeka.graphs.add-cut :as add-cut]

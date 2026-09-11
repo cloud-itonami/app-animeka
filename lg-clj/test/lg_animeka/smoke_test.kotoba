@@ -388,8 +388,8 @@
 #?(:clj
    (def repo-root
      "The repo root, found by walking up from the process cwd. The suite is
-     started both from lg-clj/ (`bb test`) and from the repo root
-     (`bb lg-clj/run_tests.clj`), so neither cwd can be assumed."
+     started both from lg-clj/ (`kbb -M:test`) and from the repo root
+     (`kbb lg-clj/run_tests.cljk`), so neither cwd can be assumed."
      (loop [d (.getCanonicalFile (java.io.File. (System/getProperty "user.dir")))]
        (cond
          (nil? d) nil

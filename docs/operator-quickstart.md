@@ -24,7 +24,7 @@ minute; later runs are seconds.
 From the repo root:
 
 ```bash
-bb lg-clj/run_tests.clj
+kbb lg-clj/run_tests.cljk
 ```
 
 ```
@@ -35,7 +35,7 @@ Ran 47 tests containing 193 assertions.
 0 failures, 0 errors.
 ```
 
-`cd lg-clj && bb test` is equivalent — the same file behind the `bb.edn` task.
+`cd lg-clj && kbb -M:test` is equivalent — the same file behind the `bb.edn` task.
 Both work; the tests locate the repo root themselves rather than assuming a
 working directory.
 
@@ -45,7 +45,7 @@ it is usable as a gate.
 ## 3. Start the server
 
 ```bash
-bb lg-clj/run_tests.clj --server 2027
+kbb lg-clj/run_tests.cljk --server 2027
 ```
 
 It prints `lg-animeka clj server up on :2027 — graphs=27` and serves on

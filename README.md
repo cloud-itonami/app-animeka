@@ -24,8 +24,8 @@ The repo carries four trees. One of them works here.
 Start here: [`docs/operator-quickstart.md`](docs/operator-quickstart.md).
 
 ```bash
-bb lg-clj/run_tests.clj              # 47 tests, 193 assertions, 0 failures
-bb lg-clj/run_tests.clj --server 2027
+kbb lg-clj/run_tests.cljk              # 47 tests, 193 assertions, 0 failures
+kbb lg-clj/run_tests.cljk --server 2027
 curl -s localhost:2027/ok            # {"ok":true,"graphs":[...27...],"version":"0.1.0"}
 ```
 

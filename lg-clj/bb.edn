@@ -4,7 +4,7 @@
  ;;   src   — lg-animeka.* namespaces (27 graphs + server + shared seams)
  ;;   test  — lg-animeka.smoke-test (clojure.test)
  ;;
- ;; Run the suite:  bb test   (or:  bb run_tests.clj)
+ ;; Run the suite:  bb test   (or:  kbb run_tests.cljk)
  ;;
  ;; Pins match the wave-1 twins (etzhayyim-project-recap/lg-clj/bb.edn) so the
  ;; langgraph-clj StateGraph API is byte-identical across the migrated apps.

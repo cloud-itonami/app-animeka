@@ -295,7 +295,7 @@
 // animeka v3 cut pipeline — LangGraph control strip (cut atom)
 //──────────────────────────────────────────────────────────────────────
 // Mirrors lg/scripts/render-cut-v3.py + com.etzhayyim.animeka.cutRunner pod loop.
-// 12-stage anime production (60-apps/.../animeka/CLAUDE.md) collapsed
+// 12-stage anime production (60-apps/.../animeka/AGENTS.md) collapsed
 // to the per-cut keyframe+inbetween+composite control flow.
 const CONTROL_NODES = [
   { id: "c_start",        kind:"control", x:    0, y: 0, w:  80, h: 50, title: "START",            badge: "start" },
@@ -322,7 +322,7 @@ const CONTROL_EDGES = [
 ];
 
 //──────────────────────────────────────────────────────────────────────
-// Per-cut data (mocked from ADR-2605222000 + animeka CLAUDE.md examples)
+// Per-cut data (mocked from ADR-2605222000 + animeka AGENTS.md examples)
 //──────────────────────────────────────────────────────────────────────
 // Real data plug-in: replace CUTS[] with `com.etzhayyim.animeka.listCuts` XRPC
 // response + per-cut `keyframe` / `inbetween` / `composite` records.

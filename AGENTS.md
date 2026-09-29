@@ -15,7 +15,7 @@
 
 ## Multi-DID Architecture `[DESIGN]`
 
-Project Actor Composition (1 project = 1 convoId + N member DIDs, `60-apps/CLAUDE.md` §Project Actor Composition)。
+Project Actor Composition (1 project = 1 convoId + N member DIDs, `60-apps/AGENTS.md` §Project Actor Composition)。
 
 | DID | 用途 |
 |---|---|
@@ -179,7 +179,7 @@ retake comment は `#t={frame}f` fragment で frame pin。
 
 ```
 60-apps/etzhayyim-project-animeka/
-├── CLAUDE.md
+├── AGENTS.md
 ├── appview/
 │   └── etzhayyim-wasm-animeka-an1m3k4x/
 │       ├── kotodama.jsonld          # triggers + derive rules + profile

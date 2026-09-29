@@ -18,7 +18,7 @@ Keeps:
   - Hyperdrive RW for `com.etzhayyim.animeka.*` domain rows
   - bpmn-dispatcher receives fire-and-forget OCEL audit only
 
-Per the design doc in /lg/CLAUDE.md, animeka has 16 actor sub-DIDs
+Per the design doc in /lg/AGENTS.md, animeka has 16 actor sub-DIDs
 (director, screenwriter, storyboarder, layout, keyAnimator, etc.) —
 the per-actor workflow lives in graphs/ and dispatches to the
 appropriate vLLM tier + ComfyUI based on the production stage.

@@ -8,7 +8,7 @@
 Same root cause as lg-shinshi: the LangServer-based animeka pool
 (`mitama-animeka-pool`, 3 replicas) suffers from the same shared-queue
 saturation pattern (registers `generic.{db.insert,db.select,...}` along
-with 13 `animeka.*` task types). Per CLAUDE.md "Recent Completion:
+with 13 `animeka.*` task types). Per AGENTS.md "Recent Completion:
 animeka.etzhayyim.com worker isolation" the BPMN E2E was always pending.
 
 LangGraph Server gives us:

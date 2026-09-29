@@ -6,7 +6,7 @@ Team-based anime production actor — 27 LangGraph StateGraphs covering the
 than the page/panel of its manga sibling.
 
 Machine-readable identity is `README.edn`; this file is the operator's map.
-**`CLAUDE.md` describes the target design, not the current state** — it names a
+**`AGENTS.md` describes the target design, not the current state** — it names a
 single TS-native Cloudflare Worker on `animeka.etzhayyim.com` as the runtime.
 That is not what runs in this repo today. What runs is below.
 
@@ -75,7 +75,7 @@ therefore never reached. Treat the tree as unverified rather than broken.
 ```
 README.edn                  machine-readable identity (etzhayyim.repository/readme-v1)
 migration.edn               where this repo was split from, and at which revision
-CLAUDE.md                   target design — read as intent, not as description
+AGENTS.md                   target design — read as intent, not as description
 MIGRATION-TODO.md           substrate-boundary checklist inherited at the split; open
 lg-clj/                     the working tree — see docs/operator-quickstart.md
 lg/                         Python graph server (stub)

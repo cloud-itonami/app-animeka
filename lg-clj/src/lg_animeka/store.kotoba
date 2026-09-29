@@ -2,7 +2,7 @@
   "Injectable persistence seam — clj port of the RisingWave/psycopg DB edge that
   every animeka graph node uses (ADR-2606280030).
 
-  DEVIATION (noted, per CLAUDE.md substrate boundary + ADR-2605262130): the
+  DEVIATION (noted, per AGENTS.md substrate boundary + ADR-2605262130): the
   Python nodes open psycopg/asyncpg connections to RisingWave (`RW_URL`) and run
   raw SQL against `vertex_animeka` / `vertex_repo_record`. RisingWave is
   deprecated and the substrate boundary forbids it; the repo's canonical state
